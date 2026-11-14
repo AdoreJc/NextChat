@@ -19,6 +19,7 @@ import {
   trackAuthorizationPageButtonToCPaymentClick,
 } from "../utils/auth-settings-events";
 import clsx from "clsx";
+import { FEATURES } from "../config/site";
 
 const storage = safeLocalStorage();
 
@@ -48,7 +49,7 @@ export function AuthPage() {
 
   return (
     <div className={styles["auth-page"]}>
-      <TopBanner></TopBanner>
+      {FEATURES.upstreamLinks && <TopBanner></TopBanner>}
       <div className={styles["auth-header"]}>
         <IconButton
           icon={<LeftIcon />}
@@ -93,19 +94,21 @@ export function AuthPage() {
               );
             }}
           />
-          <PasswordInput
-            style={{ marginTop: "3vh", marginBottom: "3vh" }}
-            aria={Locale.Settings.ShowPassword}
-            aria-label={Locale.Settings.Access.Google.ApiKey.Placeholder}
-            value={accessStore.googleApiKey}
-            type="text"
-            placeholder={Locale.Settings.Access.Google.ApiKey.Placeholder}
-            onChange={(e) => {
-              accessStore.update(
-                (access) => (access.googleApiKey = e.currentTarget.value),
-              );
-            }}
-          />
+          {FEATURES.multiProvider && (
+            <PasswordInput
+              style={{ marginTop: "3vh", marginBottom: "3vh" }}
+              aria={Locale.Settings.ShowPassword}
+              aria-label={Locale.Settings.Access.Google.ApiKey.Placeholder}
+              value={accessStore.googleApiKey}
+              type="text"
+              placeholder={Locale.Settings.Access.Google.ApiKey.Placeholder}
+              onChange={(e) => {
+                accessStore.update(
+                  (access) => (access.googleApiKey = e.currentTarget.value),
+                );
+              }}
+            />
+          )}
         </>
       ) : null}
 
@@ -115,12 +118,14 @@ export function AuthPage() {
           type="primary"
           onClick={goChat}
         />
-        <IconButton
-          text={Locale.Auth.SaasTips}
-          onClick={() => {
-            goSaas();
-          }}
-        />
+        {FEATURES.upstreamLinks && (
+          <IconButton
+            text={Locale.Auth.SaasTips}
+            onClick={() => {
+              goSaas();
+            }}
+          />
+        )}
       </div>
     </div>
   );

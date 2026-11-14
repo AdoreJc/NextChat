@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { singleSiteBlocked } from "@/app/api/single-site";
 
 async function handle(
   req: NextRequest,
   { params }: { params: { action: string; key: string[] } },
 ) {
+  const blocked = singleSiteBlocked();
+  if (blocked) return blocked;
   const requestUrl = new URL(req.url);
   const endpoint = requestUrl.searchParams.get("endpoint");
 

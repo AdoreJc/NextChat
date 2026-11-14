@@ -9,6 +9,7 @@ import { useRef, useState, RefObject, useEffect, useMemo } from "react";
 import { copyToClipboard, useWindowSize } from "../utils";
 import mermaid from "mermaid";
 import Locale from "../locales";
+import { FEATURES } from "../config/site";
 import LoadingIcon from "../icons/three-dots.svg";
 import ReloadButtonIcon from "../icons/reload.svg";
 import React from "react";
@@ -150,10 +151,12 @@ export function PreCode(props: { children: any }) {
       )}
       {htmlCode.length > 0 && enableArtifacts && (
         <FullScreen className="no-dark html" right={70}>
-          <ArtifactsShareButton
-            style={{ position: "absolute", right: 20, top: 10 }}
-            getCode={() => htmlCode}
-          />
+          {FEATURES.share && (
+            <ArtifactsShareButton
+              style={{ position: "absolute", right: 20, top: 10 }}
+              getCode={() => htmlCode}
+            />
+          )}
           <IconButton
             style={{ position: "absolute", right: 120, top: 10 }}
             bordered

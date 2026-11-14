@@ -85,6 +85,7 @@ import { ChatControllerPool } from "../client/controller";
 import { DalleQuality, DalleStyle, ModelSize } from "../typing";
 import { Prompt, usePromptStore } from "../store/prompt";
 import Locale from "../locales";
+import { FEATURES } from "../config/site";
 
 import { IconButton } from "./button";
 import styles from "./chat.module.scss";
@@ -142,7 +143,7 @@ const MCPAction = () => {
 
   useEffect(() => {
     const checkMcpStatus = async () => {
-      const enabled = await isMcpEnabled();
+      const enabled = FEATURES.mcp && (await isMcpEnabled());
       setMcpEnabled(enabled);
       if (enabled) {
         const count = await getAvailableClientsCount(accessCode);
@@ -796,7 +797,7 @@ export function ChatActions(props: {
           />
         )}
 
-        {showPlugins(currentProviderName, currentModel) && (
+        {FEATURES.plugins && showPlugins(currentProviderName, currentModel) && (
           <ChatAction
             onClick={() => {
               if (pluginStore.getAll().length == 0) {
@@ -836,7 +837,7 @@ export function ChatActions(props: {
         {!isMobileScreen && <MCPAction />}
       </>
       <div className={styles["chat-input-actions-end"]}>
-        {config.realtimeConfig.enable && (
+        {FEATURES.realtime && config.realtimeConfig.enable && (
           <ChatAction
             onClick={() => props.setShowChatSidePanel(true)}
             text={"Realtime Chat"}
@@ -1914,27 +1915,28 @@ function _Chat() {
                                           )
                                         }
                                       />
-                                      {config.ttsConfig.enable && (
-                                        <ChatAction
-                                          text={
-                                            speechStatus
-                                              ? Locale.Chat.Actions.StopSpeech
-                                              : Locale.Chat.Actions.Speech
-                                          }
-                                          icon={
-                                            speechStatus ? (
-                                              <SpeakStopIcon />
-                                            ) : (
-                                              <SpeakIcon />
-                                            )
-                                          }
-                                          onClick={() =>
-                                            openaiSpeech(
-                                              getMessageTextContent(message),
-                                            )
-                                          }
-                                        />
-                                      )}
+                                      {FEATURES.tts &&
+                                        config.ttsConfig.enable && (
+                                          <ChatAction
+                                            text={
+                                              speechStatus
+                                                ? Locale.Chat.Actions.StopSpeech
+                                                : Locale.Chat.Actions.Speech
+                                            }
+                                            icon={
+                                              speechStatus ? (
+                                                <SpeakStopIcon />
+                                              ) : (
+                                                <SpeakIcon />
+                                              )
+                                            }
+                                            onClick={() =>
+                                              openaiSpeech(
+                                                getMessageTextContent(message),
+                                              )
+                                            }
+                                          />
+                                        )}
                                     </>
                                   )}
                                 </div>

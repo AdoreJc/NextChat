@@ -4,6 +4,7 @@ import { prettyObject } from "@/app/utils/format";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/api/auth";
 import { getHeader } from "@/app/utils/tencent";
+import { singleSiteBlocked } from "@/app/api/single-site";
 
 const serverConfig = getServerSideConfig();
 
@@ -12,6 +13,8 @@ async function handle(
   { params }: { params: { path: string[] } },
 ) {
   console.log("[Tencent Route] params ", params);
+  const blocked = singleSiteBlocked();
+  if (blocked) return blocked;
 
   if (req.method === "OPTIONS") {
     return NextResponse.json({ body: "OK" }, { status: 200 });

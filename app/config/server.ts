@@ -1,5 +1,6 @@
 import md5 from "spark-md5";
 import { DEFAULT_MODELS, DEFAULT_GA_ID } from "../constant";
+import { SINGLE_SITE } from "./site";
 import { isGPT4Model } from "../utils/model";
 
 declare global {
@@ -24,6 +25,7 @@ declare global {
       CUSTOM_MODELS?: string; // to control custom models
       DEFAULT_MODEL?: string; // to control default model in every new chat window
       VISION_MODELS?: string; // to control vision models
+      SUMMARIZE_MODEL?: string; // model for title and summary requests, defaults to the session model
 
       // stability only
       STABILITY_URL?: string;
@@ -256,7 +258,8 @@ export const getServerSideConfig = () => {
     ai302ApiKey: getApiKey(process.env.AI302_API_KEY),
 
     gtmId: process.env.GTM_ID,
-    gaId: process.env.GA_ID || DEFAULT_GA_ID,
+    // single-site build: no analytics unless GA_ID is set explicitly
+    gaId: process.env.GA_ID || (SINGLE_SITE ? undefined : DEFAULT_GA_ID),
 
     needCode: ACCESS_CODES.size > 0,
     code: process.env.CODE,
@@ -274,5 +277,6 @@ export const getServerSideConfig = () => {
     visionModels,
     allowedWebDavEndpoints,
     enableMcp: process.env.ENABLE_MCP === "true",
+    summarizeModel: process.env.SUMMARIZE_MODEL?.trim() ?? "",
   };
 };

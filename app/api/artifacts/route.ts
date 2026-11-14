@@ -1,8 +1,11 @@
 import md5 from "spark-md5";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSideConfig } from "@/app/config/server";
+import { singleSiteBlocked } from "@/app/api/single-site";
 
 async function handle(req: NextRequest, res: NextResponse) {
+  const blocked = singleSiteBlocked();
+  if (blocked) return blocked;
   const serverConfig = getServerSideConfig();
   const storeUrl = () =>
     `https://api.cloudflare.com/client/v4/accounts/${serverConfig.cloudflareAccountId}/storage/kv/namespaces/${serverConfig.cloudflareKVNamespaceId}`;

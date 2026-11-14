@@ -1,6 +1,6 @@
 {
-  "name": "NextChat",
-  "short_name": "NextChat",
+  "name": "OpenPalm Chat",
+  "short_name": "OpenPalm Chat",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
@@ -14,7 +14,7 @@
     }
   ],
   "start_url": "/",
-  "theme_color": "#ffffff",
+  "theme_color": "#4f46e5",
   "background_color": "#ffffff",
   "display": "standalone"
 }

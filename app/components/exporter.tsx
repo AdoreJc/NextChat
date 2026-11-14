@@ -23,6 +23,7 @@ import CopyIcon from "../icons/copy.svg";
 import LoadingIcon from "../icons/three-dots.svg";
 import NextChatIcon from "../icons/nextchat-bot.png";
 import ShareIcon from "../icons/share.svg";
+import { FEATURES, SITE_NAME } from "../config/site";
 
 import DownloadIcon from "../icons/download.svg";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -380,13 +381,15 @@ export function PreviewActions(props: {
           icon={<DownloadIcon />}
           onClick={props.download}
         ></IconButton>
-        <IconButton
-          text={Locale.Export.Share}
-          bordered
-          shadow
-          icon={loading ? <LoadingIcon /> : <ShareIcon />}
-          onClick={share}
-        ></IconButton>
+        {FEATURES.share && (
+          <IconButton
+            text={Locale.Export.Share}
+            bordered
+            shadow
+            icon={loading ? <LoadingIcon /> : <ShareIcon />}
+            onClick={share}
+          ></IconButton>
+        )}
       </div>
       <div
         style={{
@@ -524,10 +527,12 @@ export function ImagePreviewer(props: {
           </div>
 
           <div>
-            <div className={styles["main-title"]}>NextChat</div>
-            <div className={styles["sub-title"]}>
-              github.com/ChatGPTNextWeb/NextChat
-            </div>
+            <div className={styles["main-title"]}>{SITE_NAME}</div>
+            {FEATURES.upstreamLinks && (
+              <div className={styles["sub-title"]}>
+                github.com/ChatGPTNextWeb/NextChat
+              </div>
+            )}
             <div className={styles["icons"]}>
               <MaskAvatar avatar={config.avatar} />
               <span className={styles["icon-space"]}>&</span>

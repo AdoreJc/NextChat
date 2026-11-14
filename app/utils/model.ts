@@ -1,5 +1,6 @@
 import { DEFAULT_MODELS, ServiceProvider } from "../constant";
 import { LLMModel } from "../client/api";
+import { FEATURES } from "../config/site";
 
 const CustomSeq = {
   val: -1000, //To ensure the custom model located at front, start from -1000, refer to constant.ts
@@ -21,6 +22,24 @@ const customProvider = (providerName: string) => ({
   providerType: "custom",
   sorted: CustomSeq.next(providerName),
 });
+
+/**
+ * single-site build: only models of the OpenAI compatible provider and
+ * custom models are offered, the other built-in providers are dropped.
+ */
+export function filterSiteModels<T extends { provider?: LLMModel["provider"] }>(
+  models: T[],
+): T[] {
+  if (FEATURES.multiProvider) {
+    return models;
+  }
+  return models.filter(
+    (m) =>
+      !m.provider ||
+      m.provider.providerType === "custom" ||
+      m.provider.providerName === ServiceProvider.OpenAI,
+  );
+}
 
 /**
  * Sorts an array of models based on specified rules.

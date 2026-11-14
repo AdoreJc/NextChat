@@ -1,5 +1,6 @@
 import OpenAPIClientAxios from "openapi-client-axios";
 import { StoreKey } from "../constant";
+import { FEATURES } from "../config/site";
 import { nanoid } from "nanoid";
 import { createPersistStore } from "../utils/store";
 import { getClientConfig } from "../config/client";
@@ -207,6 +208,9 @@ export const usePluginStore = createPersistStore(
     },
 
     getAsTools(ids: string[]) {
+      if (!FEATURES.plugins) {
+        return [[], {}];
+      }
       const plugins = get().plugins;
       const selected = (ids || [])
         .map((id) => plugins[id])
@@ -233,6 +237,11 @@ export const usePluginStore = createPersistStore(
     onRehydrateStorage(state) {
       // Skip store rehydration on server side
       if (typeof window === "undefined") {
+        return;
+      }
+
+      // builtin plugins load their schema from third-party hosts
+      if (!FEATURES.plugins) {
         return;
       }
 

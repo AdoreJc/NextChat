@@ -19,6 +19,7 @@ import ar from "./ar";
 import bn from "./bn";
 import sk from "./sk";
 import { merge } from "../utils/merge";
+import { FEATURES } from "../config/site";
 import { safeLocalStorage } from "@/app/utils";
 
 import type { LocaleType } from "./cn";
@@ -84,6 +85,18 @@ const targetLang = ALL_LANGS[getLang()] as LocaleType;
 
 // if target lang missing some fields, it will use fallback lang string
 merge(fallbackLang, targetLang);
+
+// single-site build: the upstream "unauthorized" hint advertises the upstream
+// SaaS in every language, replace it with a hint about this site
+if (!FEATURES.upstreamLinks) {
+  const SITE_UNAUTHORIZED: Partial<Record<Lang, string>> = {
+    en: "🔑 The API key is missing or invalid. Open this page from the chat link in your API console, or [fill in the endpoint and API key in settings](/#/settings).",
+    cn: "🔑 缺少 API Key 或 Key 无效。请从 API 控制台的聊天链接进入本页，或在[设置](/#/settings)里填写接口地址和 API Key。",
+    tw: "🔑 缺少 API Key 或 Key 無效。請從 API 控制台的聊天連結進入本頁，或在[設定](/#/settings)裡填寫介面位址和 API Key。",
+  };
+  fallbackLang.Error.Unauthorized =
+    SITE_UNAUTHORIZED[getLang()] ?? (SITE_UNAUTHORIZED.en as string);
+}
 
 export default fallbackLang as LocaleType;
 
