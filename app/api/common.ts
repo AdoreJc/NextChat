@@ -7,23 +7,6 @@ import { FEATURES } from "../config/site";
 
 const serverConfig = getServerSideConfig();
 
-/**
- * single-site build: the server only forwards to the API site configured
- * with BASE_URL. Used by every route that would reach a third party.
- */
-export function singleSiteBlocked() {
-  if (FEATURES.thirdPartyProxy) {
-    return null;
-  }
-  return NextResponse.json(
-    {
-      error: true,
-      message: "this endpoint is disabled on this site",
-    },
-    { status: 404 },
-  );
-}
-
 export async function requestOpenai(req: NextRequest) {
   const controller = new AbortController();
 

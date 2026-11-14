@@ -17,6 +17,7 @@ import {
 import fs from "fs/promises";
 import path from "path";
 import md5 from "spark-md5";
+import { isSingleSite } from "../config/site";
 
 const logger = new MCPClientLogger("MCP Actions");
 const CONFIG_PATH = path.join(process.cwd(), "app/mcp/mcp_config.json");
@@ -422,5 +423,7 @@ async function updateMcpConfig(config: McpConfigData): Promise<void> {
 
 // 检查 MCP 是否启用
 export async function isMcpEnabled() {
-  return process.env.ENABLE_MCP === "true";
+  // single-site build (FEATURES.mcp off): MCP stays disabled on the server
+  // too, even when ENABLE_MCP is set
+  return !isSingleSite() && process.env.ENABLE_MCP === "true";
 }

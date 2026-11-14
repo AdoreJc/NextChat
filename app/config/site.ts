@@ -9,7 +9,8 @@
  * Build-time switch: build with `NEXT_PUBLIC_SINGLE_SITE=0` to get the
  * upstream multi-provider behaviour back (third-party requests included).
  */
-export const SINGLE_SITE = process.env.NEXT_PUBLIC_SINGLE_SITE !== "0";
+export const isSingleSite = () => process.env.NEXT_PUBLIC_SINGLE_SITE !== "0";
+export const SINGLE_SITE = isSingleSite();
 
 export const SITE_NAME = "OpenPalm Chat";
 export const SITE_DESCRIPTION = "Your AI assistant.";
