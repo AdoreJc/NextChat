@@ -157,6 +157,29 @@ function getSummarizeModel(
   return [currentModel, providerName];
 }
 
+/**
+ * Model used for title and summary requests.
+ * single-site build: SUMMARIZE_MODEL from the server wins, then the user's
+ * "Summary Model" setting, then the model of the session.
+ */
+export function pickSummarizeModel(
+  modelConfig: Pick<
+    ModelConfig,
+    "model" | "providerName" | "compressModel" | "compressProviderName"
+  >,
+): string[] {
+  const siteSummarizeModel = SINGLE_SITE
+    ? useAccessStore.getState().summarizeModel
+    : "";
+  if (siteSummarizeModel) {
+    return [siteSummarizeModel, ServiceProvider.OpenAI];
+  }
+  // if not config compressModel, then using getSummarizeModel
+  return modelConfig.compressModel
+    ? [modelConfig.compressModel, modelConfig.compressProviderName]
+    : getSummarizeModel(modelConfig.model, modelConfig.providerName);
+}
+
 function countMessages(msgs: ChatMessage[]) {
   return msgs.reduce(
     (pre, cur) => pre + estimateTokenLength(getMessageTextContent(cur)),
@@ -678,20 +701,7 @@ export const useChatStore = createPersistStore(
           return;
         }
 
-        // if not config compressModel, then using getSummarizeModel
-        // SUMMARIZE_MODEL on the server pins one model for all title and
-        // summary requests
-        const siteSummarizeModel = SINGLE_SITE
-          ? useAccessStore.getState().summarizeModel
-          : "";
-        const [model, providerName] = siteSummarizeModel
-          ? [siteSummarizeModel, ServiceProvider.OpenAI]
-          : modelConfig.compressModel
-          ? [modelConfig.compressModel, modelConfig.compressProviderName]
-          : getSummarizeModel(
-              session.mask.modelConfig.model,
-              session.mask.modelConfig.providerName,
-            );
+        const [model, providerName] = pickSummarizeModel(modelConfig);
         const api: ClientApi = getClientApi(providerName as ServiceProvider);
 
         // remove error messages if any
