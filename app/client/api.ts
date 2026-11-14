@@ -1,4 +1,5 @@
 import { getClientConfig } from "../config/client";
+import { FEATURES } from "../config/site";
 import {
   ACCESS_CODE_PREFIX,
   ModelProvider,
@@ -255,7 +256,11 @@ export function getHeaders(ignoreHeaders: boolean = false) {
   const clientConfig = getClientConfig();
 
   function getConfig() {
-    const modelConfig = chatStore.currentSession().mask.modelConfig;
+    const sessionModelConfig = chatStore.currentSession().mask.modelConfig;
+    // single-site build: always authenticate as the OpenAI compatible provider
+    const modelConfig = FEATURES.multiProvider
+      ? sessionModelConfig
+      : { ...sessionModelConfig, providerName: ServiceProvider.OpenAI };
     const isGoogle = modelConfig.providerName === ServiceProvider.Google;
     const isAzure = modelConfig.providerName === ServiceProvider.Azure;
     const isAnthropic = modelConfig.providerName === ServiceProvider.Anthropic;
@@ -366,6 +371,10 @@ export function getHeaders(ignoreHeaders: boolean = false) {
 }
 
 export function getClientApi(provider: ServiceProvider): ClientApi {
+  // single-site build: every model goes through the OpenAI compatible client
+  if (!FEATURES.multiProvider) {
+    return new ClientApi(ModelProvider.GPT);
+  }
   switch (provider) {
     case ServiceProvider.Google:
       return new ClientApi(ModelProvider.GeminiPro);

@@ -62,7 +62,14 @@ if (mode !== "export") {
     ];
   };
 
+  // single-site build (default): no rewrites to third-party hosts,
+  // see app/config/site.ts
+  const singleSite = process.env.NEXT_PUBLIC_SINGLE_SITE !== "0";
+
   nextConfig.rewrites = async () => {
+    if (singleSite) {
+      return { beforeFiles: [] };
+    }
     const ret = [
       // adjust for previous version directly using "/api/proxy/" as proxy base route
       // {

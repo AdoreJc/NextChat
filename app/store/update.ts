@@ -9,6 +9,7 @@ import { createPersistStore } from "../utils/store";
 import { clientUpdate } from "../utils";
 import NextChatIcon from "../icons/nextchat-bot.png";
 import Locale from "../locales";
+import { FEATURES } from "../config/site";
 import { ClientApi } from "../client/api";
 
 const ONE_MINUTE = 60 * 1000;
@@ -76,6 +77,12 @@ export const useUpdateStore = createPersistStore(
           : getClientConfig()?.version;
 
       set(() => ({ version }));
+
+      // single-site build: never ask the upstream repo for new versions
+      if (!FEATURES.updateCheck) {
+        set(() => ({ remoteVersion: "" }));
+        return;
+      }
 
       const shouldCheck = Date.now() - get().lastUpdate > 2 * 60 * ONE_MINUTE;
       if (!force && !shouldCheck) return;

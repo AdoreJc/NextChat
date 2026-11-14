@@ -29,6 +29,7 @@ import {
   SUMMARIZE_MODEL,
 } from "../constant";
 import Locale, { getLang } from "../locales";
+import { SINGLE_SITE } from "../config/site";
 import { prettyObject } from "../utils/format";
 import { createPersistStore } from "../utils/store";
 import { estimateTokenLength } from "../utils/token";
@@ -123,6 +124,11 @@ function getSummarizeModel(
   currentModel: string,
   providerName: string,
 ): string[] {
+  // single-site build: no hard-coded summarize model, title and summary
+  // requests use the model of the current session
+  if (SINGLE_SITE) {
+    return [currentModel, providerName];
+  }
   // if it is using gpt-* models, force to use 4o-mini to summarize
   if (currentModel.startsWith("gpt") || currentModel.startsWith("chatgpt")) {
     const configStore = useAppConfig.getState();
@@ -149,6 +155,29 @@ function getSummarizeModel(
   }
 
   return [currentModel, providerName];
+}
+
+/**
+ * Model used for title and summary requests.
+ * single-site build: SUMMARIZE_MODEL from the server wins, then the user's
+ * "Summary Model" setting, then the model of the session.
+ */
+export function pickSummarizeModel(
+  modelConfig: Pick<
+    ModelConfig,
+    "model" | "providerName" | "compressModel" | "compressProviderName"
+  >,
+): string[] {
+  const siteSummarizeModel = SINGLE_SITE
+    ? useAccessStore.getState().summarizeModel
+    : "";
+  if (siteSummarizeModel) {
+    return [siteSummarizeModel, ServiceProvider.OpenAI];
+  }
+  // if not config compressModel, then using getSummarizeModel
+  return modelConfig.compressModel
+    ? [modelConfig.compressModel, modelConfig.compressProviderName]
+    : getSummarizeModel(modelConfig.model, modelConfig.providerName);
 }
 
 function countMessages(msgs: ChatMessage[]) {
@@ -672,13 +701,7 @@ export const useChatStore = createPersistStore(
           return;
         }
 
-        // if not config compressModel, then using getSummarizeModel
-        const [model, providerName] = modelConfig.compressModel
-          ? [modelConfig.compressModel, modelConfig.compressProviderName]
-          : getSummarizeModel(
-              session.mask.modelConfig.model,
-              session.mask.modelConfig.providerName,
-            );
+        const [model, providerName] = pickSummarizeModel(modelConfig);
         const api: ClientApi = getClientApi(providerName as ServiceProvider);
 
         // remove error messages if any

@@ -3,6 +3,7 @@ import { getServerSideConfig } from "../config/server";
 import { OPENAI_BASE_URL, ServiceProvider } from "../constant";
 import { cloudflareAIGatewayUrl } from "../utils/cloudflare";
 import { getModelProvider, isModelNotavailableInServer } from "../utils/model";
+import { FEATURES } from "../config/site";
 
 const serverConfig = getServerSideConfig();
 
@@ -28,6 +29,19 @@ export async function requestOpenai(req: NextRequest) {
   }
 
   let path = `${req.nextUrl.pathname}`.replaceAll("/api/openai/", "");
+
+  if (!FEATURES.thirdPartyProxy && (isAzure || !serverConfig.baseUrl)) {
+    // never fall back to api.openai.com
+    return NextResponse.json(
+      {
+        error: true,
+        message: isAzure
+          ? "this endpoint is disabled on this site"
+          : "no API endpoint is configured on this server (BASE_URL is empty), open this page from your API console link or fill in the endpoint and API key in settings",
+      },
+      { status: isAzure ? 404 : 503 },
+    );
+  }
 
   let baseUrl =
     (isAzure ? serverConfig.azureUrl : serverConfig.baseUrl) || OPENAI_BASE_URL;

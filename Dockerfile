@@ -19,6 +19,10 @@ ENV OPENAI_API_KEY=""
 ENV GOOGLE_API_KEY=""
 ENV CODE=""
 
+# single-site build switch, see app/config/site.ts ("0" = upstream behaviour)
+ARG NEXT_PUBLIC_SINGLE_SITE=""
+ENV NEXT_PUBLIC_SINGLE_SITE=$NEXT_PUBLIC_SINGLE_SITE
+
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -35,6 +39,10 @@ ENV OPENAI_API_KEY=""
 ENV GOOGLE_API_KEY=""
 ENV CODE=""
 ENV ENABLE_MCP=""
+# API site the server forwards to when the browser has no endpoint of its own
+ENV BASE_URL=""
+# model for title and summary requests, empty = model of the session
+ENV SUMMARIZE_MODEL=""
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./

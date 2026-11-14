@@ -32,10 +32,13 @@ import dynamic from "next/dynamic";
 import { Selector, showConfirm } from "./ui-lib";
 import clsx from "clsx";
 import { isMcpEnabled } from "../mcp/actions";
+import { FEATURES, SITE_DESCRIPTION, SITE_NAME } from "../config/site";
 
 const DISCOVERY = [
-  { name: Locale.Plugin.Name, path: Path.Plugins },
-  { name: "Stable Diffusion", path: Path.Sd },
+  ...(FEATURES.plugins
+    ? [{ name: Locale.Plugin.Name, path: Path.Plugins }]
+    : []),
+  ...(FEATURES.sd ? [{ name: "Stable Diffusion", path: Path.Sd }] : []),
   { name: Locale.SearchChat.Page.Title, path: Path.SearchChat },
 ];
 
@@ -236,7 +239,7 @@ export function SideBar(props: { className?: string }) {
   useEffect(() => {
     // 检查 MCP 是否启用
     const checkMcpStatus = async () => {
-      const enabled = await isMcpEnabled();
+      const enabled = FEATURES.mcp && (await isMcpEnabled());
       setMcpEnabled(enabled);
       console.log("[SideBar] MCP enabled:", enabled);
     };
@@ -250,8 +253,8 @@ export function SideBar(props: { className?: string }) {
       {...props}
     >
       <SideBarHeader
-        title="NextChat"
-        subTitle="Build your own AI assistant."
+        title={SITE_NAME}
+        subTitle={SITE_DESCRIPTION}
         logo={<NextChatIcon />}
         shouldNarrow={shouldNarrow}
       >
@@ -282,9 +285,22 @@ export function SideBar(props: { className?: string }) {
           )}
           <IconButton
             icon={<DiscoveryIcon />}
-            text={shouldNarrow ? undefined : Locale.Discovery.Name}
+            text={
+              shouldNarrow
+                ? undefined
+                : DISCOVERY.length === 1
+                ? DISCOVERY[0].name
+                : Locale.Discovery.Name
+            }
             className={styles["sidebar-bar-button"]}
-            onClick={() => setshowDiscoverySelector(true)}
+            onClick={() => {
+              // only one entry left: open it directly
+              if (DISCOVERY.length === 1) {
+                navigate(DISCOVERY[0].path, { state: { fromHome: true } });
+              } else {
+                setshowDiscoverySelector(true);
+              }
+            }}
             shadow
           />
         </div>
@@ -336,15 +352,17 @@ export function SideBar(props: { className?: string }) {
                 />
               </Link>
             </div>
-            <div className={styles["sidebar-action"]}>
-              <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-                <IconButton
-                  aria={Locale.Export.MessageFromChatGPT}
-                  icon={<GithubIcon />}
-                  shadow
-                />
-              </a>
-            </div>
+            {FEATURES.upstreamLinks && (
+              <div className={styles["sidebar-action"]}>
+                <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
+                  <IconButton
+                    aria={Locale.Export.MessageFromChatGPT}
+                    icon={<GithubIcon />}
+                    shadow
+                  />
+                </a>
+              </div>
+            )}
           </>
         }
         secondaryAction={

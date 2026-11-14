@@ -1,3 +1,13 @@
+> **OpenPalm Chat** — this repository is a fork of [NextChat](https://github.com/ChatGPTNextWeb/NextChat) (MIT) used as the
+> web chat client of a single OpenAI-compatible API site. Users arrive from the API console with their own key and endpoint
+> (`/#/?settings={"key":"…","url":"…"}`) and chat directly in the browser.
+>
+> Differences from upstream (all gated by one build-time switch, `app/config/site.ts`):
+> no third-party requests (analytics, web fonts, emoji CDN, plugin schemas, update check), a single OpenAI-compatible
+> provider, and no sync / realtime / TTS / plugin / MCP / share entries. The server only forwards to `BASE_URL`;
+> `SUMMARIZE_MODEL` optionally pins the model for title and summary requests (default: the model of the session).
+> Build with `NEXT_PUBLIC_SINGLE_SITE=0` to get the upstream behaviour back. The rest of this README is upstream's.
+
 <div align="center">
 
 <a href='https://nextchat.club'>

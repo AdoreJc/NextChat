@@ -43,6 +43,7 @@ import {
   useAppConfig,
 } from "../store";
 
+import { FEATURES } from "../config/site";
 import Locale, {
   AllLangs,
   ALL_LANG_OPTIONS,
@@ -512,42 +513,44 @@ function SyncItems() {
   return (
     <>
       <List>
-        <ListItem
-          title={Locale.Settings.Sync.CloudState}
-          subTitle={
-            syncStore.lastProvider
-              ? `${new Date(syncStore.lastSyncTime).toLocaleString()} [${
-                  syncStore.lastProvider
-                }]`
-              : Locale.Settings.Sync.NotSyncYet
-          }
-        >
-          <div style={{ display: "flex" }}>
-            <IconButton
-              aria={Locale.Settings.Sync.CloudState + Locale.UI.Config}
-              icon={<ConfigIcon />}
-              text={Locale.UI.Config}
-              onClick={() => {
-                setShowSyncConfigModal(true);
-              }}
-            />
-            {couldSync && (
+        {FEATURES.cloudSync && (
+          <ListItem
+            title={Locale.Settings.Sync.CloudState}
+            subTitle={
+              syncStore.lastProvider
+                ? `${new Date(syncStore.lastSyncTime).toLocaleString()} [${
+                    syncStore.lastProvider
+                  }]`
+                : Locale.Settings.Sync.NotSyncYet
+            }
+          >
+            <div style={{ display: "flex" }}>
               <IconButton
-                icon={<ResetIcon />}
-                text={Locale.UI.Sync}
-                onClick={async () => {
-                  try {
-                    await syncStore.sync();
-                    showToast(Locale.Settings.Sync.Success);
-                  } catch (e) {
-                    showToast(Locale.Settings.Sync.Fail);
-                    console.error("[Sync]", e);
-                  }
+                aria={Locale.Settings.Sync.CloudState + Locale.UI.Config}
+                icon={<ConfigIcon />}
+                text={Locale.UI.Config}
+                onClick={() => {
+                  setShowSyncConfigModal(true);
                 }}
               />
-            )}
-          </div>
-        </ListItem>
+              {couldSync && (
+                <IconButton
+                  icon={<ResetIcon />}
+                  text={Locale.UI.Sync}
+                  onClick={async () => {
+                    try {
+                      await syncStore.sync();
+                      showToast(Locale.Settings.Sync.Success);
+                    } catch (e) {
+                      showToast(Locale.Settings.Sync.Fail);
+                      console.error("[Sync]", e);
+                    }
+                  }}
+                />
+              )}
+            </div>
+          </ListItem>
+        )}
 
         <ListItem
           title={Locale.Settings.Sync.LocalState}
@@ -649,7 +652,7 @@ export function Settings() {
   const showUsage = accessStore.isAuthorized();
   useEffect(() => {
     // checks per minutes
-    checkUpdate();
+    FEATURES.updateCheck && checkUpdate();
     showUsage && checkUsage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -660,7 +663,7 @@ export function Settings() {
         navigate(Path.Home);
       }
     };
-    if (clientConfig?.isApp) {
+    if (clientConfig?.isApp || !FEATURES.multiProvider) {
       // Force to set custom endpoint to true if it's app
       accessStore.update((state) => {
         state.useCustomConfig = true;
@@ -694,7 +697,7 @@ export function Settings() {
     </ListItem>
   );
 
-  const saasStartComponent = (
+  const saasStartComponent = FEATURES.upstreamLinks && (
     <ListItem
       className={styles["subtitle-button"]}
       title={
@@ -720,26 +723,27 @@ export function Settings() {
   );
 
   const useCustomConfigComponent = // Conditionally render the following ListItem based on clientConfig.isApp
-    !clientConfig?.isApp && ( // only show if isApp is false
-      <ListItem
-        title={Locale.Settings.Access.CustomEndpoint.Title}
-        subTitle={Locale.Settings.Access.CustomEndpoint.SubTitle}
-      >
-        <input
-          aria-label={Locale.Settings.Access.CustomEndpoint.Title}
-          type="checkbox"
-          checked={accessStore.useCustomConfig}
-          onChange={(e) =>
-            accessStore.update(
-              (access) => (access.useCustomConfig = e.currentTarget.checked),
-            )
-          }
-        ></input>
-      </ListItem>
-    );
+    !clientConfig?.isApp &&
+      FEATURES.multiProvider && ( // only show if isApp is false
+        <ListItem
+          title={Locale.Settings.Access.CustomEndpoint.Title}
+          subTitle={Locale.Settings.Access.CustomEndpoint.SubTitle}
+        >
+          <input
+            aria-label={Locale.Settings.Access.CustomEndpoint.Title}
+            type="checkbox"
+            checked={accessStore.useCustomConfig}
+            onChange={(e) =>
+              accessStore.update(
+                (access) => (access.useCustomConfig = e.currentTarget.checked),
+              )
+            }
+          ></input>
+        </ListItem>
+      );
 
-  const openAIConfigComponent = accessStore.provider ===
-    ServiceProvider.OpenAI && (
+  const openAIConfigComponent = (!FEATURES.multiProvider ||
+    accessStore.provider === ServiceProvider.OpenAI) && (
     <>
       <ListItem
         title={Locale.Settings.Access.OpenAI.Endpoint.Title}
@@ -1459,44 +1463,44 @@ export function Settings() {
     </>
   );
 
-  const ai302ConfigComponent = accessStore.provider === ServiceProvider["302.AI"] && (
+  const ai302ConfigComponent = accessStore.provider ===
+    ServiceProvider["302.AI"] && (
     <>
       <ListItem
-          title={Locale.Settings.Access.AI302.Endpoint.Title}
-          subTitle={
-            Locale.Settings.Access.AI302.Endpoint.SubTitle +
-            AI302.ExampleEndpoint
+        title={Locale.Settings.Access.AI302.Endpoint.Title}
+        subTitle={
+          Locale.Settings.Access.AI302.Endpoint.SubTitle + AI302.ExampleEndpoint
+        }
+      >
+        <input
+          aria-label={Locale.Settings.Access.AI302.Endpoint.Title}
+          type="text"
+          value={accessStore.ai302Url}
+          placeholder={AI302.ExampleEndpoint}
+          onChange={(e) =>
+            accessStore.update(
+              (access) => (access.ai302Url = e.currentTarget.value),
+            )
           }
-        >
-          <input
-            aria-label={Locale.Settings.Access.AI302.Endpoint.Title}
-            type="text"
-            value={accessStore.ai302Url}
-            placeholder={AI302.ExampleEndpoint}
-            onChange={(e) =>
-              accessStore.update(
-                (access) => (access.ai302Url = e.currentTarget.value),
-              )
-            }
-          ></input>
-        </ListItem>
-        <ListItem
-          title={Locale.Settings.Access.AI302.ApiKey.Title}
-          subTitle={Locale.Settings.Access.AI302.ApiKey.SubTitle}
-        >
-          <PasswordInput
-            aria-label={Locale.Settings.Access.AI302.ApiKey.Title}
-            value={accessStore.ai302ApiKey}
-            type="text"
-            placeholder={Locale.Settings.Access.AI302.ApiKey.Placeholder}
-            onChange={(e) => {
-              accessStore.update(
-                (access) => (access.ai302ApiKey = e.currentTarget.value),
-              );
-            }}
-          />
-        </ListItem>
-      </>
+        ></input>
+      </ListItem>
+      <ListItem
+        title={Locale.Settings.Access.AI302.ApiKey.Title}
+        subTitle={Locale.Settings.Access.AI302.ApiKey.SubTitle}
+      >
+        <PasswordInput
+          aria-label={Locale.Settings.Access.AI302.ApiKey.Title}
+          value={accessStore.ai302ApiKey}
+          type="text"
+          placeholder={Locale.Settings.Access.AI302.ApiKey.Placeholder}
+          onChange={(e) => {
+            accessStore.update(
+              (access) => (access.ai302ApiKey = e.currentTarget.value),
+            );
+          }}
+        />
+      </ListItem>
+    </>
   );
 
   return (
@@ -1551,38 +1555,49 @@ export function Settings() {
             </Popover>
           </ListItem>
 
-          <ListItem
-            title={Locale.Settings.Update.Version(currentVersion ?? "unknown")}
-            subTitle={
-              checkingUpdate
-                ? Locale.Settings.Update.IsChecking
-                : hasNewVersion
-                ? Locale.Settings.Update.FoundUpdate(remoteId ?? "ERROR")
-                : Locale.Settings.Update.IsLatest
-            }
-          >
-            {checkingUpdate ? (
-              <LoadingIcon />
-            ) : hasNewVersion ? (
-              clientConfig?.isApp ? (
+          {!FEATURES.updateCheck && (
+            <ListItem
+              title={Locale.Settings.Update.Version(
+                clientConfig?.version ?? "unknown",
+              )}
+            />
+          )}
+          {FEATURES.updateCheck && (
+            <ListItem
+              title={Locale.Settings.Update.Version(
+                currentVersion ?? "unknown",
+              )}
+              subTitle={
+                checkingUpdate
+                  ? Locale.Settings.Update.IsChecking
+                  : hasNewVersion
+                  ? Locale.Settings.Update.FoundUpdate(remoteId ?? "ERROR")
+                  : Locale.Settings.Update.IsLatest
+              }
+            >
+              {checkingUpdate ? (
+                <LoadingIcon />
+              ) : hasNewVersion ? (
+                clientConfig?.isApp ? (
+                  <IconButton
+                    icon={<ResetIcon></ResetIcon>}
+                    text={Locale.Settings.Update.GoToUpdate}
+                    onClick={() => clientUpdate()}
+                  />
+                ) : (
+                  <Link href={updateUrl} target="_blank" className="link">
+                    {Locale.Settings.Update.GoToUpdate}
+                  </Link>
+                )
+              ) : (
                 <IconButton
                   icon={<ResetIcon></ResetIcon>}
-                  text={Locale.Settings.Update.GoToUpdate}
-                  onClick={() => clientUpdate()}
+                  text={Locale.Settings.Update.CheckUpdate}
+                  onClick={() => checkUpdate(true)}
                 />
-              ) : (
-                <Link href={updateUrl} target="_blank" className="link">
-                  {Locale.Settings.Update.GoToUpdate}
-                </Link>
-              )
-            ) : (
-              <IconButton
-                icon={<ResetIcon></ResetIcon>}
-                text={Locale.Settings.Update.CheckUpdate}
-                onClick={() => checkUpdate(true)}
-              />
-            )}
-          </ListItem>
+              )}
+            </ListItem>
+          )}
 
           <ListItem title={Locale.Settings.SendKey}>
             <Select
@@ -1823,7 +1838,9 @@ export function Settings() {
             <>
               {useCustomConfigComponent}
 
-              {accessStore.useCustomConfig && (
+              {!FEATURES.multiProvider && openAIConfigComponent}
+
+              {FEATURES.multiProvider && accessStore.useCustomConfig && (
                 <>
                   <ListItem
                     title={Locale.Settings.Access.Provider.Title}
@@ -1929,28 +1946,32 @@ export function Settings() {
         {shouldShowPromptModal && (
           <UserPromptModal onClose={() => setShowPromptModal(false)} />
         )}
-        <List>
-          <RealtimeConfigList
-            realtimeConfig={config.realtimeConfig}
-            updateConfig={(updater) => {
-              const realtimeConfig = { ...config.realtimeConfig };
-              updater(realtimeConfig);
-              config.update(
-                (config) => (config.realtimeConfig = realtimeConfig),
-              );
-            }}
-          />
-        </List>
-        <List>
-          <TTSConfigList
-            ttsConfig={config.ttsConfig}
-            updateConfig={(updater) => {
-              const ttsConfig = { ...config.ttsConfig };
-              updater(ttsConfig);
-              config.update((config) => (config.ttsConfig = ttsConfig));
-            }}
-          />
-        </List>
+        {FEATURES.realtime && (
+          <List>
+            <RealtimeConfigList
+              realtimeConfig={config.realtimeConfig}
+              updateConfig={(updater) => {
+                const realtimeConfig = { ...config.realtimeConfig };
+                updater(realtimeConfig);
+                config.update(
+                  (config) => (config.realtimeConfig = realtimeConfig),
+                );
+              }}
+            />
+          </List>
+        )}
+        {FEATURES.tts && (
+          <List>
+            <TTSConfigList
+              ttsConfig={config.ttsConfig}
+              updateConfig={(updater) => {
+                const ttsConfig = { ...config.ttsConfig };
+                updater(ttsConfig);
+                config.update((config) => (config.ttsConfig = ttsConfig));
+              }}
+            />
+          </List>
+        )}
 
         <DangerItems />
       </div>

@@ -25,6 +25,7 @@ describe("MCP server actions require MCP to be enabled", () => {
   const ORIGINAL_CODE = process.env.CODE;
 
   afterEach(() => {
+    delete process.env.NEXT_PUBLIC_SINGLE_SITE;
     if (ORIGINAL_ENABLE_MCP === undefined) {
       delete process.env.ENABLE_MCP;
     } else {
@@ -73,7 +74,11 @@ describe("MCP server actions require MCP to be enabled", () => {
   });
 
   describe("when ENABLE_MCP=true", () => {
+    // OpenPalm Chat: the single-site build keeps MCP off regardless of
+    // ENABLE_MCP (see test/single-site-server.test.ts), so this suite runs as
+    // the multi-provider build
     beforeEach(() => {
+      process.env.NEXT_PUBLIC_SINGLE_SITE = "0";
       process.env.ENABLE_MCP = "true";
       process.env.CODE = "test-code";
     });

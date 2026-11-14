@@ -30,6 +30,7 @@ import { type ClientApi, getClientApi } from "../client/api";
 import { useAccessStore } from "../store";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
+import { FEATURES } from "../config/site";
 
 export function Loading(props: { noLogo?: boolean }) {
   return (
@@ -160,18 +161,19 @@ export function WindowContent(props: { children: React.ReactNode }) {
 function Screen() {
   const config = useAppConfig();
   const location = useLocation();
-  const isArtifact = location.pathname.includes(Path.Artifacts);
+  const isArtifact =
+    FEATURES.share && location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isAuth = location.pathname === Path.Auth;
-  const isSd = location.pathname === Path.Sd;
-  const isSdNew = location.pathname === Path.SdNew;
+  const isSd = FEATURES.sd && location.pathname === Path.Sd;
+  const isSdNew = FEATURES.sd && location.pathname === Path.SdNew;
 
   const isMobileScreen = useMobileScreen();
   const shouldTightBorder =
     getClientConfig()?.isApp || (config.tightBorder && !isMobileScreen);
 
   useEffect(() => {
-    loadAsyncGoogleFont();
+    if (FEATURES.remoteFont) loadAsyncGoogleFont();
   }, []);
 
   if (isArtifact) {
@@ -197,11 +199,15 @@ function Screen() {
             <Route path={Path.Home} element={<Chat />} />
             <Route path={Path.NewChat} element={<NewChat />} />
             <Route path={Path.Masks} element={<MaskPage />} />
-            <Route path={Path.Plugins} element={<PluginPage />} />
+            {FEATURES.plugins && (
+              <Route path={Path.Plugins} element={<PluginPage />} />
+            )}
             <Route path={Path.SearchChat} element={<SearchChat />} />
             <Route path={Path.Chat} element={<Chat />} />
             <Route path={Path.Settings} element={<Settings />} />
-            <Route path={Path.McpMarket} element={<McpMarketPage />} />
+            {FEATURES.mcp && (
+              <Route path={Path.McpMarket} element={<McpMarketPage />} />
+            )}
           </Routes>
         </WindowContent>
       </>
@@ -245,7 +251,7 @@ export function Home() {
 
     const initMcp = async () => {
       try {
-        const enabled = await isMcpEnabled();
+        const enabled = FEATURES.mcp && (await isMcpEnabled());
         if (enabled) {
           console.log("[MCP] initializing...");
           await initializeMcpSystem(useAccessStore.getState().accessCode);

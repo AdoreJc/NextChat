@@ -16,6 +16,7 @@ import { handle as xaiHandler } from "../../xai";
 import { handle as chatglmHandler } from "../../glm";
 import { handle as proxyHandler } from "../../proxy";
 import { handle as ai302Handler } from "../../302ai";
+import { singleSiteBlocked } from "../../single-site";
 
 async function handle(
   req: NextRequest,
@@ -23,6 +24,11 @@ async function handle(
 ) {
   const apiPath = `/api/${params.provider}`;
   console.log(`[${params.provider} Route] params `, params);
+  // single-site build: only the OpenAI compatible route is served
+  if (apiPath !== ApiPath.OpenAI) {
+    const blocked = singleSiteBlocked();
+    if (blocked) return blocked;
+  }
   switch (apiPath) {
     case ApiPath.Azure:
       return azureHandler(req, { params });

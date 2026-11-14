@@ -20,6 +20,7 @@ import { Modal, showToast } from "./ui-lib";
 import { copyToClipboard, downloadAs } from "../utils";
 import { Path, ApiPath, REPO_URL } from "@/app/constant";
 import { Loading } from "./home";
+import { FEATURES, SITE_NAME } from "../config/site";
 import styles from "./artifacts.module.scss";
 
 type HTMLPreviewProps = {
@@ -229,9 +230,11 @@ export function Artifacts() {
   return (
     <div className={styles["artifacts"]}>
       <div className={styles["artifacts-header"]}>
-        <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-          <IconButton bordered icon={<GithubIcon />} shadow />
-        </a>
+        {FEATURES.upstreamLinks && (
+          <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
+            <IconButton bordered icon={<GithubIcon />} shadow />
+          </a>
+        )}
         <IconButton
           bordered
           style={{ marginLeft: 20 }}
@@ -239,12 +242,14 @@ export function Artifacts() {
           shadow
           onClick={() => previewRef.current?.reload()}
         />
-        <div className={styles["artifacts-title"]}>NextChat Artifacts</div>
-        <ArtifactsShareButton
-          id={id}
-          getCode={() => code}
-          fileName={fileName}
-        />
+        <div className={styles["artifacts-title"]}>{SITE_NAME} Artifacts</div>
+        {FEATURES.share && (
+          <ArtifactsShareButton
+            id={id}
+            getCode={() => code}
+            fileName={fileName}
+          />
+        )}
       </div>
       <div className={styles["artifacts-content"]}>
         {loading && <Loading />}

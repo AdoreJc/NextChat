@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { STORAGE_KEY, internalAllowedWebDavEndpoints } from "../../../constant";
 import { getServerSideConfig } from "@/app/config/server";
+import { singleSiteBlocked } from "@/app/api/single-site";
 
 const config = getServerSideConfig();
 
@@ -21,6 +22,8 @@ async function handle(
   req: NextRequest,
   { params }: { params: { path: string[] } },
 ) {
+  const blocked = singleSiteBlocked();
+  if (blocked) return blocked;
   if (req.method === "OPTIONS") {
     return NextResponse.json({ body: "OK" }, { status: 200 });
   }

@@ -5,6 +5,7 @@ import EmojiPicker, {
 } from "emoji-picker-react";
 
 import { ModelType } from "../store";
+import { FEATURES } from "../config/site";
 
 import BotIconDefault from "../icons/nextchat-bot.svg";
 import BotIconGemini from "../icons/llm-icons/gemini.svg";
@@ -21,6 +22,9 @@ import BotIconHunyuan from "../icons/llm-icons/hunyuan.svg";
 import BotIconDoubao from "../icons/llm-icons/doubao.svg";
 import BotIconChatglm from "../icons/llm-icons/chatglm.svg";
 
+// single-site build: render native emoji, no image CDN
+const EMOJI_STYLE = FEATURES.remoteEmoji ? EmojiStyle.APPLE : EmojiStyle.NATIVE;
+
 export function getEmojiUrl(unified: string, style: EmojiStyle) {
   // Whoever owns this Content Delivery Network (CDN), I am using your CDN to serve emojis
   // Old CDN broken, so I had to switch to this one
@@ -36,6 +40,7 @@ export function AvatarPicker(props: {
       width={"100%"}
       lazyLoadEmojis
       theme={EmojiTheme.AUTO}
+      emojiStyle={EMOJI_STYLE}
       getEmojiUrl={getEmojiUrl}
       onEmojiClick={(e) => {
         props.onEmojiClick(e.unified);
@@ -104,6 +109,7 @@ export function EmojiAvatar(props: { avatar: string; size?: number }) {
     <Emoji
       unified={props.avatar}
       size={props.size ?? 18}
+      emojiStyle={EMOJI_STYLE}
       getEmojiUrl={getEmojiUrl}
     />
   );
