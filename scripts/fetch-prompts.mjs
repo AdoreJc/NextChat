@@ -14,6 +14,10 @@ const FILE = "./public/prompts.json";
 
 const ignoreWords = ["涩涩", "魅魔", "澀澀"];
 
+// OpenPalm Chat: jailbreak prompts ("DAN" and the like) are not shipped
+const isBlockedPrompt = (v) =>
+  v.some((s) => /\bDAN\b/.test(s) || /jailbreak|越狱|越獄/i.test(s));
+
 const timeoutPromise = (timeout) => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -84,6 +88,9 @@ async function fetchEN() {
 async function main() {
   Promise.all([fetchCN(), fetchTW(), fetchEN()])
     .then(([cn, tw, en]) => {
+      [cn, tw, en] = [cn, tw, en].map((list) =>
+        list.filter((v) => !isBlockedPrompt(v)),
+      );
       fs.writeFile(FILE, JSON.stringify({ cn, tw, en }));
     })
     .catch((e) => {
