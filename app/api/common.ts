@@ -122,8 +122,13 @@ export async function requestOpenai(req: NextRequest) {
     signal: controller.signal,
   };
 
+  // single-site build without a server side key: every request carries the
+  // user's own key and the API site decides which models it may use, so the
+  // CUSTOM_MODELS list only shapes the list shown before a key is entered
+  const userKeyOnly = !FEATURES.thirdPartyProxy && !serverConfig.apiKey;
+
   // #1815 try to refuse gpt4 request
-  if (serverConfig.customModels && req.body) {
+  if (serverConfig.customModels && req.body && !userKeyOnly) {
     try {
       const clonedBody = await req.text();
       fetchOptions.body = clonedBody;
