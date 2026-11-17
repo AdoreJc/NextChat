@@ -357,6 +357,7 @@ describe("callback", () => {
     await expect(completeLogin(good, rejected)).resolves.toEqual({
       ok: false,
       reason: "exchange_failed",
+      message: "invalid grant",
     });
     expect(rejected.save).not.toHaveBeenCalled();
 
@@ -377,6 +378,71 @@ describe("callback", () => {
       reason: "exchange_failed",
     });
     expect(offline.save).not.toHaveBeenCalled();
+  });
+
+  test("a refused exchange hands on the reason the API site gave", async () => {
+    // e.g. the account already holds as many tokens as it may
+    const d = deps({
+      fetch: exchangeFetch(400, {
+        success: false,
+        message: "  token limit reached <b>x</b>  ",
+        code: "invalid_grant",
+      }),
+    });
+    await expect(completeLogin(good, d)).resolves.toEqual({
+      ok: false,
+      reason: "exchange_failed",
+      // handed on as text, the page renders it as text
+      message: "token limit reached <b>x</b>",
+    });
+    expect(d.save).not.toHaveBeenCalled();
+  });
+
+  test("any answer but 200 is a failure, with a general reason when none is given", async () => {
+    for (const [status, body] of [
+      [403, {}],
+      [403, { message: 42 }],
+      [500, { message: "" }],
+      [201, { success: true, data: { key: TEST_KEY } }],
+      [204, { success: true, data: { key: TEST_KEY } }],
+    ] as [number, unknown][]) {
+      const d = deps({ fetch: exchangeFetch(status, body) });
+      const result = await completeLogin(good, d);
+      expect(result).toEqual({ ok: false, reason: "exchange_failed" });
+      expect("message" in result).toBe(false);
+      expect(d.save).not.toHaveBeenCalled();
+    }
+    // an answer that is not JSON
+    const broken = deps({
+      fetch: jest.fn(async () => ({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new SyntaxError("Unexpected token <");
+        },
+      })),
+    });
+    await expect(completeLogin(good, broken)).resolves.toEqual({
+      ok: false,
+      reason: "exchange_failed",
+    });
+  });
+
+  test("a failed exchange does not start another sign-in", async () => {
+    const d = deps({ fetch: exchangeFetch(400, { message: "no" }) });
+    const assign = jest.fn();
+    const replace = jest.fn();
+    const before = window.location.href;
+
+    await completeLogin(good, d);
+
+    // one request, no pending sign-in left, nothing navigated
+    expect(d.fetch).toHaveBeenCalledTimes(1);
+    expect(d.storage.data.size).toBe(0);
+    expect(sessionStorage.getItem(LOGIN_STATE_STORAGE_KEY)).toBeNull();
+    expect(assign).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+    expect(window.location.href).toBe(before);
   });
 
   test("an exchange answer without a usable key stores nothing", async () => {

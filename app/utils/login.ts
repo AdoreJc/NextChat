@@ -286,7 +286,21 @@ export type LoginFailure =
   | "exchange_failed"
   | "invalid_response";
 
-export type LoginResult = { ok: true } | { ok: false; reason: LoginFailure };
+export type LoginResult =
+  | { ok: true }
+  // `message`: the reason the API site gave for a refused exchange
+  | { ok: false; reason: LoginFailure; message?: string };
+
+/** the readable reason in a refused exchange answer, as plain text */
+async function exchangeMessage(res: Pick<Response, "json">) {
+  try {
+    const message = (await res.json())?.message;
+    if (typeof message === "string" && message.trim()) {
+      return message.trim().slice(0, 300);
+    }
+  } catch {}
+  return undefined;
+}
 
 /**
  * Check a callback against the `state` this tab created, then exchange the
@@ -350,8 +364,14 @@ export async function completeLogin(
       referrerPolicy: "no-referrer",
       redirect: "error",
     });
-    if (!res.ok) {
-      return { ok: false, reason: "exchange_failed" };
+    // anything but 200 is a refusal; nothing is retried from here
+    if (res.status !== 200) {
+      const message = await exchangeMessage(res);
+      return {
+        ok: false,
+        reason: "exchange_failed",
+        ...(message ? { message } : {}),
+      };
     }
     body = await res.json();
   } catch {
@@ -400,6 +420,24 @@ export function loginNoticeFor(
   if (!reply.isLast) return null;
   if (!access.openaiApiKey) return "required";
   return reply.repliedAt > (access.loginAt ?? 0) ? "expired" : null;
+}
+
+/**
+ * "Import local data" in the settings merges a backup file into the stores,
+ * the access config (endpoint, key) included. With sign-in configured the
+ * access config belongs to the sign-in: it is put back as it was, so a file
+ * cannot change where the key is sent.
+ */
+export async function importKeepingAccess<T extends AccessLike>(
+  runImport: () => Promise<unknown>,
+  accessStore: { getState: () => T; setState: (state: T) => void },
+  singleSite = SINGLE_SITE,
+) {
+  const before = accessStore.getState();
+  await runImport();
+  if (isLoginEnabled(before, singleSite)) {
+    accessStore.setState(before);
+  }
 }
 
 /**

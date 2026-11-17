@@ -1,17 +1,25 @@
 import { jest } from "@jest/globals";
 
+// Warm-up: the store pulls in most of the client code. Loading it once here,
+// while the file is being set up, keeps that first (slow) load out of every
+// timed hook and test below; the fresh copies they load reuse the compiled
+// modules.
+import "../app/store/access";
+
 // The access store is filled from two sides: the state stored in this browser
 // (read asynchronously) and the server config from /api/config. The server
 // config has to win, whichever arrives first. Before the fix a slow read of
 // the stored state overwrote a server config that had arrived earlier.
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 const TEST_KEY = "sk-test-0000000000000000";
 
+type AccessStore = typeof import("../app/store/access").useAccessStore;
+
+/** a fresh copy of the store over the given browser storage and server */
 async function loadStore(options: {
   stored: Record<string, unknown>;
   server: Record<string, unknown>;
+  /** how long the browser storage takes to answer, ms */
   storageDelay: number;
 }) {
   jest.resetModules();
@@ -41,21 +49,24 @@ async function loadStore(options: {
   return { useAccessStore, fetchMock };
 }
 
-beforeEach(() => {
+function quiet() {
   jest.spyOn(console, "log").mockImplementation(() => {});
   jest.spyOn(console, "warn").mockImplementation(() => {});
   jest.spyOn(console, "error").mockImplementation(() => {});
-});
+}
 
-afterEach(() => {
+afterAll(() => {
   jest.restoreAllMocks();
   delete (globalThis as any).indexedDB;
   localStorage.clear();
 });
 
-describe("server config and stored state", () => {
-  test("a server config that arrives before the stored state is not overwritten", async () => {
-    const { useAccessStore } = await loadStore({
+describe("a server config that arrives before the stored state", () => {
+  let useAccessStore: AccessStore;
+
+  beforeAll(async () => {
+    quiet();
+    ({ useAccessStore } = await loadStore({
       stored: {
         customModels: "stale-from-browser",
         openaiApiKey: TEST_KEY,
@@ -63,10 +74,12 @@ describe("server config and stored state", () => {
       server: { customModels: "from-server" },
       // the server answers first
       storageDelay: 40,
-    });
+    }));
+  });
 
-    useAccessStore.getState().fetch();
-    await sleep(150);
+  test("is not overwritten", async () => {
+    // settles when the config request is done and the stored state is read
+    await useAccessStore.getState().whenConfigLoaded();
 
     expect(useAccessStore.persist.hasHydrated()).toBe(true);
     const access = useAccessStore.getState();
@@ -75,25 +88,40 @@ describe("server config and stored state", () => {
     // what only the browser knows is kept
     expect(access.openaiApiKey).toBe(TEST_KEY);
   });
+});
 
-  test("a stored login url does not survive the server switching sign-in off", async () => {
-    const { useAccessStore } = await loadStore({
+describe("a stored login url", () => {
+  let useAccessStore: AccessStore;
+
+  beforeAll(async () => {
+    quiet();
+    ({ useAccessStore } = await loadStore({
       stored: { loginUrl: "https://old.example.test/chat-authorize" },
       server: { loginUrl: "" },
       storageDelay: 40,
-    });
+    }));
+  });
 
+  test("does not survive the server switching sign-in off", async () => {
     await useAccessStore.getState().whenConfigLoaded();
     expect(useAccessStore.getState().loginUrl).toBe("");
   });
+});
 
-  test("the user's key is not sent along with the config request", async () => {
-    const { useAccessStore, fetchMock } = await loadStore({
+describe("the config request", () => {
+  let useAccessStore: AccessStore;
+  let fetchMock: Awaited<ReturnType<typeof loadStore>>["fetchMock"];
+
+  beforeAll(async () => {
+    quiet();
+    ({ useAccessStore, fetchMock } = await loadStore({
       stored: { openaiApiKey: TEST_KEY },
       server: {},
       storageDelay: 0,
-    });
+    }));
+  });
 
+  test("does not carry the user's key", async () => {
     // read the stored state first, so there is a key that could be sent
     await useAccessStore.getState().whenHydrated();
     expect(useAccessStore.getState().openaiApiKey).toBe(TEST_KEY);

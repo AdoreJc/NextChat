@@ -44,7 +44,11 @@ import {
 } from "../store";
 
 import { FEATURES } from "../config/site";
-import { isLoginEnabled, startLogin } from "../utils/login";
+import {
+  importKeepingAccess,
+  isLoginEnabled,
+  startLogin,
+} from "../utils/login";
 import Locale, {
   AllLangs,
   ALL_LANG_OPTIONS,
@@ -571,7 +575,7 @@ function SyncItems() {
               icon={<DownloadIcon />}
               text={Locale.UI.Import}
               onClick={() => {
-                syncStore.import();
+                importKeepingAccess(() => syncStore.import(), useAccessStore);
               }}
             />
           </div>

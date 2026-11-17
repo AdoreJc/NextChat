@@ -87,7 +87,10 @@ export function AuthCallbackPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const handled = useRef(false);
-  const [failure, setFailure] = useState<LoginFailure | null>(null);
+  const [failure, setFailure] = useState<{
+    reason: LoginFailure;
+    message?: string;
+  } | null>(null);
   // the login url may arrive with the server config after this page shows
   const canRetry = useAccessStore((state) => isLoginEnabled(state));
 
@@ -104,7 +107,7 @@ export function AuthCallbackPage() {
       // opened without parameters; nothing was asked for
       if (!handled.current) {
         dropPendingLogin();
-        setFailure("state_mismatch");
+        setFailure({ reason: "state_mismatch" });
       }
       return;
     }
@@ -126,7 +129,7 @@ export function AuthCallbackPage() {
         if (result.ok) {
           navigate(Path.Chat, { replace: true });
         } else {
-          setFailure(result.reason);
+          setFailure({ reason: result.reason, message: result.message });
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,7 +140,11 @@ export function AuthCallbackPage() {
   }
 
   return (
-    <LoginShell title={Locale.Login.Failed} tips={Locale.Login.Errors[failure]}>
+    <LoginShell
+      title={Locale.Login.Failed}
+      // the reason the API site gave (shown as plain text), or a general one
+      tips={failure.message ?? Locale.Login.Errors[failure.reason]}
+    >
       {canRetry && (
         <IconButton
           text={Locale.Login.Retry}
