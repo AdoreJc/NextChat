@@ -93,6 +93,15 @@ const en: LocaleType = {
       return inputHints + ", / to search prompts, : to use commands";
     },
     Send: "Send",
+    Greeting: "What would you like to talk about?",
+    Placeholder: "Ask anything",
+    Disclaimer: "AI-generated content can be wrong. Check important facts.",
+    Suggestions: [
+      "Help me write an email",
+      "Explain a piece of code",
+      "Summarize the key points of an article",
+    ],
+    More: "More actions",
     StartSpeak: "Start Speak",
     StopSpeak: "Stop Speak",
     Config: {
@@ -155,6 +164,9 @@ const en: LocaleType = {
   },
   Home: {
     NewChat: "New Chat",
+    Recents: "Recent chats",
+    ToggleSidebar: "Expand or collapse the sidebar",
+    OpenSidebar: "Open sidebar",
     DeleteChat: "Confirm to delete the selected conversation?",
     DeleteToast: "Chat Deleted",
     Revert: "Revert",

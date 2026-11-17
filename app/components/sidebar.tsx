@@ -2,16 +2,17 @@ import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./home.module.scss";
 
-import { IconButton } from "./button";
-import SettingsIcon from "../icons/settings.svg";
 import GithubIcon from "../icons/github.svg";
 import NextChatIcon from "../icons/logo.svg";
-import AddIcon from "../icons/add.svg";
-import DeleteIcon from "../icons/delete.svg";
-import MaskIcon from "../icons/mask.svg";
-import McpIcon from "../icons/mcp.svg";
 import DragIcon from "../icons/drag.svg";
-import DiscoveryIcon from "../icons/discovery.svg";
+import {
+  MaskLine,
+  NewChatLine,
+  SearchLine,
+  SettingsLine,
+  SidebarLine,
+  ToolLine,
+} from "./line-icons";
 
 import Locale from "../locales";
 
@@ -26,20 +27,19 @@ import {
   REPO_URL,
 } from "../constant";
 
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { isIOS, useMobileScreen } from "../utils";
 import dynamic from "next/dynamic";
-import { Selector, showConfirm } from "./ui-lib";
 import clsx from "clsx";
 import { isMcpEnabled } from "../mcp/actions";
-import { FEATURES, SITE_DESCRIPTION, SITE_NAME } from "../config/site";
+import { FEATURES, SITE_NAME } from "../config/site";
 
-const DISCOVERY = [
+// entries that only exist when their feature is switched on
+const EXTRA_ENTRIES = [
   ...(FEATURES.plugins
     ? [{ name: Locale.Plugin.Name, path: Path.Plugins }]
     : []),
   ...(FEATURES.sd ? [{ name: "Stable Diffusion", path: Path.Sd }] : []),
-  { name: Locale.SearchChat.Page.Title, path: Path.SearchChat },
 ];
 
 const ChatList = dynamic(async () => (await import("./chat-list")).ChatList, {
@@ -65,6 +65,13 @@ export function useHotKey() {
   });
 }
 
+// Widths of this layout. The store keeps upstream's numbers: its default
+// width stands for ours, anything below the minimum means "collapsed".
+const SIDEBAR_WIDTH = 260;
+const RAIL_WIDTH = 56;
+const sidebarWidthOf = (stored?: number) =>
+  !stored || stored === DEFAULT_SIDEBAR_WIDTH ? SIDEBAR_WIDTH : stored;
+
 export function useDragSideBar() {
   const limit = (x: number) => Math.min(MAX_SIDEBAR_WIDTH, x);
 
@@ -86,7 +93,7 @@ export function useDragSideBar() {
   const onDragStart = (e: MouseEvent) => {
     // Remembers the initial width each time the mouse is pressed
     startX.current = e.clientX;
-    startDragWidth.current = config.sidebarWidth;
+    startDragWidth.current = sidebarWidthOf(config.sidebarWidth);
     const dragStartTime = Date.now();
 
     const handleDragMove = (e: MouseEvent) => {
@@ -127,8 +134,8 @@ export function useDragSideBar() {
 
   useEffect(() => {
     const barWidth = shouldNarrow
-      ? NARROW_SIDEBAR_WIDTH
-      : limit(config.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);
+      ? RAIL_WIDTH
+      : limit(sidebarWidthOf(config.sidebarWidth));
     const sideBarWidth = isMobileScreen ? "100vw" : `${barWidth}px`;
     document.documentElement.style.setProperty("--sidebar-width", sideBarWidth);
   }, [config.sidebarWidth, isMobileScreen, shouldNarrow]);
@@ -136,6 +143,29 @@ export function useDragSideBar() {
   return {
     onDragStart,
     shouldNarrow,
+    toggleSideBar,
+  };
+}
+
+/**
+ * Open an empty chat. An untouched empty session is reused, so that pressing
+ * the entry repeatedly does not pile up blank chats.
+ */
+export function useStartNewChat() {
+  const navigate = useNavigate();
+  return () => {
+    const chatStore = useChatStore.getState();
+    const latest = chatStore.sessions[0];
+    const isBlank =
+      !!latest &&
+      latest.messages.length === 0 &&
+      latest.mask.context.length === 0;
+    if (isBlank) {
+      chatStore.selectSession(0);
+    } else {
+      chatStore.newSession();
+    }
+    navigate(Path.Chat);
   };
 }
 
@@ -229,11 +259,10 @@ export function SideBarTail(props: {
 
 export function SideBar(props: { className?: string }) {
   useHotKey();
-  const { onDragStart, shouldNarrow } = useDragSideBar();
-  const [showDiscoverySelector, setshowDiscoverySelector] = useState(false);
+  const { onDragStart, shouldNarrow, toggleSideBar } = useDragSideBar();
   const navigate = useNavigate();
   const config = useAppConfig();
-  const chatStore = useChatStore();
+  const startNewChat = useStartNewChat();
   const [mcpEnabled, setMcpEnabled] = useState(false);
 
   useEffect(() => {
@@ -241,10 +270,12 @@ export function SideBar(props: { className?: string }) {
     const checkMcpStatus = async () => {
       const enabled = FEATURES.mcp && (await isMcpEnabled());
       setMcpEnabled(enabled);
-      console.log("[SideBar] MCP enabled:", enabled);
     };
     checkMcpStatus();
   }, []);
+
+  const fromHome = { state: { fromHome: true } };
+  const openSearch = () => navigate(Path.SearchChat, fromHome);
 
   return (
     <SideBarContainer
@@ -252,135 +283,127 @@ export function SideBar(props: { className?: string }) {
       shouldNarrow={shouldNarrow}
       {...props}
     >
-      <SideBarHeader
-        title={SITE_NAME}
-        subTitle={SITE_DESCRIPTION}
-        logo={<NextChatIcon />}
-        shouldNarrow={shouldNarrow}
-      >
-        <div className={styles["sidebar-header-bar"]}>
-          <IconButton
-            icon={<MaskIcon />}
-            text={shouldNarrow ? undefined : Locale.Mask.Name}
-            className={styles["sidebar-bar-button"]}
-            onClick={() => {
-              if (config.dontShowMaskSplashScreen !== true) {
-                navigate(Path.NewChat, { state: { fromHome: true } });
-              } else {
-                navigate(Path.Masks, { state: { fromHome: true } });
-              }
-            }}
-            shadow
-          />
-          {mcpEnabled && (
-            <IconButton
-              icon={<McpIcon />}
-              text={shouldNarrow ? undefined : Locale.Mcp.Name}
-              className={styles["sidebar-bar-button"]}
-              onClick={() => {
-                navigate(Path.McpMarket, { state: { fromHome: true } });
-              }}
-              shadow
-            />
-          )}
-          <IconButton
-            icon={<DiscoveryIcon />}
-            text={
-              shouldNarrow
-                ? undefined
-                : DISCOVERY.length === 1
-                ? DISCOVERY[0].name
-                : Locale.Discovery.Name
-            }
-            className={styles["sidebar-bar-button"]}
-            onClick={() => {
-              // only one entry left: open it directly
-              if (DISCOVERY.length === 1) {
-                navigate(DISCOVERY[0].path, { state: { fromHome: true } });
-              } else {
-                setshowDiscoverySelector(true);
-              }
-            }}
-            shadow
-          />
+      <div className={styles["side-top"]} data-tauri-drag-region>
+        <div className={clsx(styles["side-brand"], "no-dark")}>
+          <NextChatIcon />
+          <span>{SITE_NAME}</span>
         </div>
-        {showDiscoverySelector && (
-          <Selector
-            items={[
-              ...DISCOVERY.map((item) => {
-                return {
-                  title: item.name,
-                  value: item.path,
-                };
-              }),
-            ]}
-            onClose={() => setshowDiscoverySelector(false)}
-            onSelection={(s) => {
-              navigate(s[0], { state: { fromHome: true } });
-            }}
-          />
+        <button
+          className={clsx(
+            styles["side-icon-button"],
+            styles["side-hide-narrow"],
+          )}
+          title={Locale.SearchChat.Page.Title}
+          aria-label={Locale.SearchChat.Page.Title}
+          onClick={openSearch}
+        >
+          <SearchLine />
+        </button>
+        <button
+          className={clsx(styles["side-icon-button"], styles["side-toggle"])}
+          title={Locale.Home.ToggleSidebar}
+          aria-label={Locale.Home.ToggleSidebar}
+          aria-expanded={!shouldNarrow}
+          data-testid="sidebar-toggle"
+          onClick={toggleSideBar}
+        >
+          <SidebarLine />
+        </button>
+      </div>
+
+      <nav className={styles["side-nav"]}>
+        <button
+          className={styles["side-row"]}
+          title={Locale.Home.NewChat}
+          data-testid="new-chat"
+          onClick={startNewChat}
+        >
+          <NewChatLine />
+          <span>{Locale.Home.NewChat}</span>
+        </button>
+        <button
+          className={clsx(styles["side-row"], styles["side-row-narrow-only"])}
+          title={Locale.SearchChat.Page.Title}
+          onClick={openSearch}
+        >
+          <SearchLine />
+          <span>{Locale.SearchChat.Page.Title}</span>
+        </button>
+        <button
+          className={styles["side-row"]}
+          title={Locale.Mask.Name}
+          onClick={() => {
+            if (config.dontShowMaskSplashScreen !== true) {
+              navigate(Path.NewChat, fromHome);
+            } else {
+              navigate(Path.Masks, fromHome);
+            }
+          }}
+        >
+          <MaskLine />
+          <span>{Locale.Mask.Name}</span>
+        </button>
+        {mcpEnabled && (
+          <button
+            className={styles["side-row"]}
+            title={Locale.Mcp.Name}
+            onClick={() => navigate(Path.McpMarket, fromHome)}
+          >
+            <ToolLine />
+            <span>{Locale.Mcp.Name}</span>
+          </button>
         )}
-      </SideBarHeader>
-      <SideBarBody
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            navigate(Path.Home);
-          }
-        }}
-      >
-        <ChatList narrow={shouldNarrow} />
-      </SideBarBody>
-      <SideBarTail
-        primaryAction={
-          <>
-            <div className={clsx(styles["sidebar-action"], styles.mobile)}>
-              <IconButton
-                icon={<DeleteIcon />}
-                onClick={async () => {
-                  if (await showConfirm(Locale.Home.DeleteChat)) {
-                    chatStore.deleteSession(chatStore.currentSessionIndex);
-                  }
-                }}
-              />
-            </div>
-            <div className={styles["sidebar-action"]}>
-              <Link to={Path.Settings}>
-                <IconButton
-                  aria={Locale.Settings.Title}
-                  icon={<SettingsIcon />}
-                  shadow
-                />
-              </Link>
-            </div>
-            {FEATURES.upstreamLinks && (
-              <div className={styles["sidebar-action"]}>
-                <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-                  <IconButton
-                    aria={Locale.Export.MessageFromChatGPT}
-                    icon={<GithubIcon />}
-                    shadow
-                  />
-                </a>
-              </div>
-            )}
-          </>
-        }
-        secondaryAction={
-          <IconButton
-            icon={<AddIcon />}
-            text={shouldNarrow ? undefined : Locale.Home.NewChat}
-            onClick={() => {
-              if (config.dontShowMaskSplashScreen) {
-                chatStore.newSession();
-                navigate(Path.Chat);
-              } else {
-                navigate(Path.NewChat);
+        {EXTRA_ENTRIES.map((item) => (
+          <button
+            key={item.path}
+            className={styles["side-row"]}
+            title={item.name}
+            onClick={() => navigate(item.path, fromHome)}
+          >
+            <ToolLine />
+            <span>{item.name}</span>
+          </button>
+        ))}
+      </nav>
+
+      {shouldNarrow ? (
+        <div className={styles["side-spacer"]} />
+      ) : (
+        <>
+          <div className={styles["side-label"]}>{Locale.Home.Recents}</div>
+          <SideBarBody
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                navigate(Path.Home);
               }
             }}
-            shadow
-          />
-        }
-      />
+          >
+            <ChatList />
+          </SideBarBody>
+        </>
+      )}
+
+      <div className={styles["side-foot"]}>
+        <button
+          className={styles["side-row"]}
+          title={Locale.Settings.Title}
+          onClick={() => navigate(Path.Settings)}
+        >
+          <SettingsLine />
+          <span>{Locale.Settings.Title}</span>
+        </button>
+        {FEATURES.upstreamLinks && (
+          <a
+            className={clsx(styles["side-row"], "no-dark")}
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <GithubIcon />
+            <span>GitHub</span>
+          </a>
+        )}
+      </div>
     </SideBarContainer>
   );
 }
