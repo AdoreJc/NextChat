@@ -558,6 +558,7 @@ const tw = {
       access_denied: "API 站拒絕了這次登入。",
       server_error: "API 站暫時無法完成登入，請稍後重試。",
       invalid_response: "API 站回傳的內容無法識別，請稍後重試。",
+      exchange_failed: "登入憑證無效或已過期，請重試。",
     },
     Settings: {
       Title: "帳號",

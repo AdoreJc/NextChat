@@ -1853,6 +1853,10 @@ function _Chat() {
                           messageText,
                           Locale.Error.Unauthorized,
                           accessStore,
+                          {
+                            isLast: i === messages.length - 1,
+                            repliedAt: session.lastUpdate,
+                          },
                         );
 
                   return (

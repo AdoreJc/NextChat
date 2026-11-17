@@ -899,6 +899,8 @@ const en: LocaleType = {
         "The API site could not finish the sign-in. Please try again later.",
       invalid_response:
         "The API site sent a response this page does not understand. Please try again later.",
+      exchange_failed:
+        "The sign-in could not be completed or has expired. Please try again.",
     },
     Settings: {
       Title: "Account",

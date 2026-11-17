@@ -710,7 +710,7 @@ export function Settings() {
           aria={Locale.Login.Logout.Action}
           text={Locale.Login.Logout.Action}
           onClick={() => {
-            accessStore.update((access) => (access.openaiApiKey = ""));
+            accessStore.logout();
             showToast(Locale.Login.Logout.Done);
           }}
         />

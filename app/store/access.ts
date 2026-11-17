@@ -25,6 +25,7 @@ import { createPersistStore } from "../utils/store";
 import { ensure } from "../utils/clone";
 import { DEFAULT_CONFIG } from "./config";
 import { getModelProvider } from "../utils/model";
+import { SINGLE_SITE } from "../config/site";
 
 let fetchState = 0; // 0 not fetch, 1 fetching, 2 done
 // settles when the server config has arrived (or failed to)
@@ -153,6 +154,8 @@ const DEFAULT_ACCESS_STATE = {
   summarizeModel: "",
   // single-site build: authorize page of the API site, empty = no sign-in
   loginUrl: "",
+  // when the key in use was received through sign-in (ms), 0 = never
+  loginAt: 0,
 
   // tts config
   edgeTTSVoiceName: "zh-CN-YunxiNeural",
@@ -260,9 +263,9 @@ export const useAccessStore = createPersistStore(
       fetchPromise = fetch("/api/config", {
         method: "post",
         body: null,
-        headers: {
-          ...getHeaders(),
-        },
+        // single-site build: the route reads nothing from the request and the
+        // user's key has no business on this server
+        headers: SINGLE_SITE ? {} : { ...getHeaders() },
       })
         .then((res) => res.json())
         .then((res) => {
@@ -288,6 +291,26 @@ export const useAccessStore = createPersistStore(
         .finally(() => {
           fetchState = 2;
         });
+    },
+    /**
+     * Signed in through the API site: keep the key and talk to the API site
+     * directly. The endpoint is set on every sign-in, whatever was stored.
+     */
+    setLogin(key: string, apiOrigin: string) {
+      set(() => ({
+        openaiApiKey: key,
+        openaiUrl: apiOrigin,
+        useCustomConfig: true,
+        loginAt: Date.now(),
+      }));
+    },
+    /** forget the key in this browser and go back to the default endpoint */
+    logout() {
+      set(() => ({
+        openaiApiKey: "",
+        openaiUrl: DEFAULT_OPENAI_URL,
+        loginAt: 0,
+      }));
     },
     /** resolves once the state stored in this browser has been read */
     whenHydrated(): Promise<void> {

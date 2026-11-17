@@ -1,6 +1,7 @@
 import md5 from "spark-md5";
 import { DEFAULT_MODELS, DEFAULT_GA_ID } from "../constant";
 import { SINGLE_SITE } from "./site";
+import { normalizeLoginUrl } from "../utils/login";
 import { isGPT4Model } from "../utils/model";
 
 declare global {
@@ -280,6 +281,7 @@ export const getServerSideConfig = () => {
     enableMcp: process.env.ENABLE_MCP === "true",
     summarizeModel: process.env.SUMMARIZE_MODEL?.trim() ?? "",
     // authorize page of the API site, only used by the single-site build
-    loginUrl: SINGLE_SITE ? process.env.LOGIN_URL?.trim() ?? "" : "",
+    // (https only; http for localhost) an unusable value counts as not set
+    loginUrl: SINGLE_SITE ? normalizeLoginUrl(process.env.LOGIN_URL) : "",
   };
 };

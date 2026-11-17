@@ -881,6 +881,7 @@ const cn = {
       access_denied: "API 站拒绝了这次登录。",
       server_error: "API 站暂时无法完成登录，请稍后重试。",
       invalid_response: "API 站返回的内容无法识别，请稍后重试。",
+      exchange_failed: "登录凭证无效或已过期，请重试。",
     },
     Settings: {
       Title: "账号",

@@ -1,13 +1,17 @@
 /**
- * OpenPalm Chat: sign in through the API site.
+ * OpenPalm Chat: sign in through the API site (authorization code + PKCE).
  *
  * The chat site sends the browser to the authorize page of the API site
- * (`LOGIN_URL`) with a random `state`. The API site sends it back to
- * `<origin>/#/auth-callback?key=…&state=…`. The key is only stored when the
- * `state` matches the one this browser tab created, and a `state` can be used
- * once.
+ * (`LOGIN_URL`) with a random `state` and the SHA-256 of a random
+ * `code_verifier`. The API site sends it back to
+ * `<origin>/#/auth-callback?code=…&state=…`. When the `state` matches the one
+ * this browser tab created, the one-time code and the verifier are exchanged
+ * for the key with one cross-origin request. The key is never part of an
+ * address; a `key` parameter in the callback is ignored.
  *
- * Nothing in this file logs or reports the key.
+ * After that the browser talks to the API site directly.
+ *
+ * Nothing in this file logs or reports the key, the code or the verifier.
  */
 import { SINGLE_SITE } from "../config/site";
 
@@ -15,15 +19,23 @@ export const LOGIN_STATE_STORAGE_KEY = "login-state";
 // hash routes of the sign-in pages
 export const LOGIN_PATH = "/login";
 export const AUTH_CALLBACK_PATH = "/auth-callback";
+// on the origin of LOGIN_URL
+export const EXCHANGE_PATH = "/api/chat-authorize/exchange";
 
-const STATE_BYTES = 32;
-const STATE_PATTERN = /^[A-Za-z0-9_-]{32,}$/;
+const TOKEN_BYTES = 32;
+const STATE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+const VERIFIER_PATTERN = /^[A-Za-z0-9_-]{43,128}$/;
 // printable ASCII without spaces
+const CODE_PATTERN = /^[\x21-\x7e]{1,512}$/;
 const KEY_PATTERN = /^[\x21-\x7e]{1,512}$/;
 
 type StateStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
-type AccessLike = { loginUrl?: string; openaiApiKey?: string };
+type AccessLike = {
+  loginUrl?: string;
+  openaiApiKey?: string;
+  loginAt?: number;
+};
 
 function stateStorage(): StateStorage | null {
   try {
@@ -33,18 +45,34 @@ function stateStorage(): StateStorage | null {
   }
 }
 
-/** the authorize page, or "" when sign-in is not configured or not usable */
-export function getLoginUrl(access: AccessLike, singleSite = SINGLE_SITE) {
-  if (!singleSite) return "";
-  const raw = (access.loginUrl ?? "").trim();
-  if (!raw) return "";
+/**
+ * A usable authorize page address, or "". It has to be `https`; plain `http`
+ * is only accepted for `localhost` and `127.0.0.1` (local development).
+ */
+export function normalizeLoginUrl(raw: string | undefined | null) {
+  const text = (raw ?? "").trim();
+  if (!text) return "";
   try {
-    const url = new URL(raw);
-    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
-    return url.toString();
+    const url = new URL(text);
+    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (url.protocol === "https:" || (url.protocol === "http:" && local)) {
+      return url.toString();
+    }
+    return "";
   } catch {
     return "";
   }
+}
+
+/** the authorize page, or "" when sign-in is not configured or not usable */
+export function getLoginUrl(access: AccessLike, singleSite = SINGLE_SITE) {
+  if (!singleSite) return "";
+  return normalizeLoginUrl(access.loginUrl);
+}
+
+/** the API site: the origin of the authorize page */
+export function getApiOrigin(loginUrl: string) {
+  return new URL(loginUrl).origin;
 }
 
 export function isLoginEnabled(access: AccessLike, singleSite = SINGLE_SITE) {
@@ -56,10 +84,7 @@ export function needsLogin(access: AccessLike, singleSite = SINGLE_SITE) {
   return isLoginEnabled(access, singleSite) && !access.openaiApiKey;
 }
 
-/** 43 characters of `[A-Za-z0-9_-]` from 32 random bytes */
-export function createLoginState() {
-  const bytes = new Uint8Array(STATE_BYTES);
-  crypto.getRandomValues(bytes);
+function base64Url(bytes: Uint8Array) {
   let binary = "";
   bytes.forEach((b) => (binary += String.fromCharCode(b)));
   return btoa(binary)
@@ -68,23 +93,80 @@ export function createLoginState() {
     .replace(/=+$/, "");
 }
 
-/** `<LOGIN_URL>?redirect_uri=<origin + "/">&state=<state>` */
+/** 43 characters of `[A-Za-z0-9_-]` from 32 random bytes */
+function randomToken() {
+  const bytes = new Uint8Array(TOKEN_BYTES);
+  crypto.getRandomValues(bytes);
+  return base64Url(bytes);
+}
+
+export function createLoginState() {
+  return randomToken();
+}
+
+export function createCodeVerifier() {
+  return randomToken();
+}
+
+/** PKCE S256: base64url without padding of SHA-256(verifier as ASCII) */
+export async function codeChallengeFor(
+  verifier: string,
+  subtle: Pick<SubtleCrypto, "digest"> = crypto.subtle,
+) {
+  const ascii = new Uint8Array(verifier.length);
+  for (let i = 0; i < verifier.length; i++) ascii[i] = verifier.charCodeAt(i);
+  return base64Url(new Uint8Array(await subtle.digest("SHA-256", ascii)));
+}
+
+/**
+ * `<LOGIN_URL>?redirect_uri=<origin + "/">&state=…&code_challenge=…
+ * &code_challenge_method=S256`
+ */
 export function buildAuthorizeUrl(
   loginUrl: string,
   origin: string,
   state: string,
+  codeChallenge: string,
 ) {
   const url = new URL(loginUrl);
   url.searchParams.set("redirect_uri", origin + "/");
   url.searchParams.set("state", state);
+  url.searchParams.set("code_challenge", codeChallenge);
+  url.searchParams.set("code_challenge_method", "S256");
   return url.toString();
 }
 
+type PendingLogin = { state: string; verifier: string };
+
+/** the pending sign-in of this tab; reading it also drops it */
+function takePendingLogin(storage: StateStorage | null): PendingLogin | null {
+  const raw = storage?.getItem(LOGIN_STATE_STORAGE_KEY) ?? "";
+  storage?.removeItem(LOGIN_STATE_STORAGE_KEY);
+  try {
+    const pending = JSON.parse(raw) as Partial<PendingLogin>;
+    if (
+      typeof pending?.state === "string" &&
+      typeof pending?.verifier === "string" &&
+      STATE_PATTERN.test(pending.state) &&
+      VERIFIER_PATTERN.test(pending.verifier)
+    ) {
+      return { state: pending.state, verifier: pending.verifier };
+    }
+  } catch {}
+  return null;
+}
+
+/** drop the pending sign-in (state and verifier) without using it */
+export function dropPendingLogin(storage?: StateStorage | null) {
+  takePendingLogin(storage === undefined ? stateStorage() : storage);
+}
+
 /**
- * Leave for the authorize page. Returns false when sign-in is not configured.
- * `replace` keeps the current entry (the `#/login` route) out of the history.
+ * Leave for the authorize page. Resolves to false when sign-in is not
+ * configured or not possible in this browser. `replace` keeps the current
+ * entry (the `#/login` route) out of the history.
  */
-export function startLogin(
+export async function startLogin(
   access: AccessLike,
   options: {
     replace?: boolean;
@@ -100,9 +182,17 @@ export function startLogin(
 
   const location = options.location ?? window.location;
   const state = createLoginState();
-  storage.setItem(LOGIN_STATE_STORAGE_KEY, state);
+  const verifier = createCodeVerifier();
+  let challenge: string;
+  try {
+    challenge = await codeChallengeFor(verifier);
+  } catch {
+    return false;
+  }
+  // state and verifier are stored together and dropped together
+  storage.setItem(LOGIN_STATE_STORAGE_KEY, JSON.stringify({ state, verifier }));
 
-  const target = buildAuthorizeUrl(loginUrl, location.origin, state);
+  const target = buildAuthorizeUrl(loginUrl, location.origin, state, challenge);
   if (options.replace) {
     location.replace(target);
   } else {
@@ -112,12 +202,15 @@ export function startLogin(
 }
 
 export type AuthCallbackParams = {
-  key: string;
+  code: string;
   state: string;
   error: string;
 };
 
-/** `#/auth-callback?key=…&state=…` → its parameters; null for other hashes */
+/**
+ * `#/auth-callback?code=…&state=…` → its parameters; null for other hashes.
+ * Only `code`, `state` and `error` are read: a `key` parameter is ignored.
+ */
 export function parseAuthCallbackHash(hash: string): AuthCallbackParams | null {
   const route = hash.startsWith("#") ? hash.slice(1) : hash;
   const queryStart = route.indexOf("?");
@@ -126,7 +219,7 @@ export function parseAuthCallbackHash(hash: string): AuthCallbackParams | null {
 
   const params = new URLSearchParams(route.slice(queryStart + 1));
   return {
-    key: params.get("key") ?? "",
+    code: params.get("code") ?? "",
     state: params.get("state") ?? "",
     error: params.get("error") ?? "",
   };
@@ -157,8 +250,8 @@ function cleanAddress(win: CallbackWindow) {
 
 /**
  * Move the callback parameters out of the address bar into memory. Runs once
- * while the page loads, before the app renders, so the key never stays in the
- * URL or in the history entry.
+ * while the page loads, before the app renders, so the one-time code does not stay
+ * in the URL or in the history entry.
  */
 export function captureAuthCallback(win: CallbackWindow = window) {
   const params = parseAuthCallbackHash(win.location.hash);
@@ -190,31 +283,36 @@ export type LoginFailure =
   | "state_mismatch"
   | "access_denied"
   | "server_error"
+  | "exchange_failed"
   | "invalid_response";
 
 export type LoginResult = { ok: true } | { ok: false; reason: LoginFailure };
 
 /**
- * Check a callback against the `state` this tab created and store the key.
- * The stored `state` is dropped before anything else, so it works once.
- * No confirm dialog: the `state` check is what proves this browser asked.
+ * Check a callback against the `state` this tab created, then exchange the
+ * one-time code for the key and hand both the key and the API site to `save`.
+ *
+ * The stored `state` and verifier are dropped before anything else, so they
+ * work once. Without a matching `state` no request is made. No confirm
+ * dialog: the `state` check is what proves this browser asked.
  */
-export function completeLogin(
+export async function completeLogin(
   params: AuthCallbackParams,
   deps: {
-    saveKey: (key: string) => void;
+    /** the configured authorize page, see `getLoginUrl` */
+    loginUrl: string;
+    /** origin of this site */
+    origin: string;
+    save: (key: string, apiOrigin: string) => void;
     storage?: StateStorage | null;
+    fetch?: typeof fetch;
   },
-): LoginResult {
-  const storage = deps.storage === undefined ? stateStorage() : deps.storage;
-  const expected = storage?.getItem(LOGIN_STATE_STORAGE_KEY) ?? "";
-  storage?.removeItem(LOGIN_STATE_STORAGE_KEY);
+): Promise<LoginResult> {
+  const pending = takePendingLogin(
+    deps.storage === undefined ? stateStorage() : deps.storage,
+  );
 
-  if (
-    !STATE_PATTERN.test(expected) ||
-    !params.state ||
-    params.state !== expected
-  ) {
+  if (!pending || !params.state || params.state !== pending.state) {
     return { ok: false, reason: "state_mismatch" };
   }
 
@@ -226,27 +324,82 @@ export function completeLogin(
     };
   }
 
-  if (!KEY_PATTERN.test(params.key)) {
+  if (!CODE_PATTERN.test(params.code)) {
     return { ok: false, reason: "invalid_response" };
   }
 
-  deps.saveKey(params.key);
+  const loginUrl = normalizeLoginUrl(deps.loginUrl);
+  if (!loginUrl) {
+    return { ok: false, reason: "server_error" };
+  }
+  const apiOrigin = getApiOrigin(loginUrl);
+
+  let body: any;
+  try {
+    const res = await (deps.fetch ?? fetch)(apiOrigin + EXCHANGE_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: params.code,
+        code_verifier: pending.verifier,
+        redirect_uri: deps.origin + "/",
+      }),
+      // no cookies, nothing cached, the address of this page stays here
+      credentials: "omit",
+      cache: "no-store",
+      referrerPolicy: "no-referrer",
+      redirect: "error",
+    });
+    if (!res.ok) {
+      return { ok: false, reason: "exchange_failed" };
+    }
+    body = await res.json();
+  } catch {
+    return { ok: false, reason: "exchange_failed" };
+  }
+
+  const key = body?.success === true ? body?.data?.key : undefined;
+  if (typeof key !== "string" || !KEY_PATTERN.test(key)) {
+    return { ok: false, reason: "invalid_response" };
+  }
+
+  deps.save(key, apiOrigin);
   return { ok: true };
 }
 
 /**
- * What to show under a chat message that reports a rejected or missing key.
+ * The text of a reply to a request the API site answered with 401: the same
+ * hint the streaming path adds, so both get the sign-in notice.
+ */
+export function withUnauthorizedHint<T>(
+  message: T,
+  status: number,
+  unauthorizedText: string,
+): T | string {
+  if (status !== 401 || typeof message !== "string") return message;
+  return [unauthorizedText, message].filter(Boolean).join("\n\n");
+}
+
+/**
+ * What to show under a chat reply that reports a rejected or missing key.
  * It is only a notice with a button, the page never leaves on its own.
+ *
+ * Only the last reply of a conversation gets it, and only when it was written
+ * after the current sign-in: replies rejected before signing in again say
+ * nothing about the key in use now.
  */
 export function loginNoticeFor(
   messageText: string,
   unauthorizedText: string,
   access: AccessLike,
+  reply: { isLast: boolean; repliedAt: number },
   singleSite = SINGLE_SITE,
 ): "expired" | "required" | null {
   if (!isLoginEnabled(access, singleSite)) return null;
   if (!unauthorizedText || !messageText.includes(unauthorizedText)) return null;
-  return access.openaiApiKey ? "expired" : "required";
+  if (!reply.isLast) return null;
+  if (!access.openaiApiKey) return "required";
+  return reply.repliedAt > (access.loginAt ?? 0) ? "expired" : null;
 }
 
 /**

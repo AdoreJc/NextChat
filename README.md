@@ -6,7 +6,9 @@
 > no third-party requests (analytics, web fonts, emoji CDN, plugin schemas, update check), a single OpenAI-compatible
 > provider, and no sync / realtime / TTS / plugin / MCP / share entries. The server only forwards to `BASE_URL`;
 > `SUMMARIZE_MODEL` optionally pins the model for title and summary requests (default: the model of the session).
-> `LOGIN_URL` (optional) is the authorize page of the API site: when set, users sign in there and come back with a key, and the old `settings=` link import is switched off.
+> `LOGIN_URL` (optional, `https`) is the authorize page of the API site: when set, users sign in there (authorization code +
+> PKCE, the key never appears in an address), the browser then calls the API site directly, and the old `settings=` link
+> import is switched off.
 > Build with `NEXT_PUBLIC_SINGLE_SITE=0` to get the upstream behaviour back. The rest of this README is upstream's.
 
 <div align="center">

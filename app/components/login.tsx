@@ -10,19 +10,13 @@ import { Path } from "../constant";
 import { useAccessStore } from "../store";
 import {
   completeLogin,
+  dropPendingLogin,
+  getLoginUrl,
   isLoginEnabled,
   LoginFailure,
   startLogin,
   takeAuthCallback,
 } from "../utils/login";
-
-/** key as the old link import stores it; the endpoint setting is not touched */
-function saveLoginKey(key: string) {
-  useAccessStore.getState().update((access) => {
-    access.openaiApiKey = key;
-    access.useCustomConfig = true;
-  });
-}
 
 function LoginShell(props: {
   title: string;
@@ -61,9 +55,11 @@ export function LoginPage() {
         const access = useAccessStore.getState();
         if (access.openaiApiKey) {
           navigate(Path.Chat, { replace: true });
-        } else if (!startLogin(access, { replace: true })) {
-          setNotConfigured(true);
+          return;
         }
+        return startLogin(access, { replace: true }).then((started) => {
+          if (!started && !cancelled) setNotConfigured(true);
+        });
       });
     return () => {
       cancelled = true;
@@ -86,8 +82,6 @@ export function LoginPage() {
   return <LoginShell title={Locale.Login.Redirecting} />;
 }
 
-const NO_CALLBACK = { key: "", state: "", error: "" };
-
 /** `#/auth-callback`: the API site sent the browser back */
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -102,26 +96,33 @@ export function AuthCallbackPage() {
     if (params === "dropped") {
       // parameters put into the address of the running page: not a callback.
       // The pending state is used up and the page starts over without them.
-      completeLogin(NO_CALLBACK, { saveKey: () => {} });
+      dropPendingLogin();
       window.location.reload();
       return;
     }
     if (!params) {
       // opened without parameters; nothing was asked for
       if (!handled.current) {
-        completeLogin(NO_CALLBACK, { saveKey: () => {} });
+        dropPendingLogin();
         setFailure("state_mismatch");
       }
       return;
     }
     handled.current = true;
 
-    // the key goes into the stored state, which has to be loaded first
-    useAccessStore
-      .getState()
-      .whenHydrated()
-      .then(() => {
-        const result = completeLogin(params, { saveKey: saveLoginKey });
+    // the key goes into the stored state and the exchange needs the login
+    // url from the server config: wait for both
+    const accessStore = useAccessStore.getState();
+    accessStore
+      .whenConfigLoaded()
+      .then(() =>
+        completeLogin(params, {
+          loginUrl: getLoginUrl(useAccessStore.getState()),
+          origin: window.location.origin,
+          save: (key, apiOrigin) => accessStore.setLogin(key, apiOrigin),
+        }),
+      )
+      .then((result) => {
         if (result.ok) {
           navigate(Path.Chat, { replace: true });
         } else {
