@@ -543,6 +543,34 @@ const tw = {
     Topic: "主題",
     Time: "時間",
   },
+  Login: {
+    Action: "登入",
+    Required: "請先登入，然後開始對話。",
+    Expired: "登入已失效，請重新登入。",
+    Redirecting: "正在前往登入頁…",
+    Processing: "正在完成登入…",
+    NotConfigured: "本站沒有開啟登入。",
+    Failed: "登入失敗",
+    Retry: "重試",
+    BackToChat: "返回聊天",
+    Errors: {
+      state_mismatch: "這次登入請求無效或已過期，請重新登入。",
+      access_denied: "API 站拒絕了這次登入。",
+      server_error: "API 站暫時無法完成登入，請稍後重試。",
+      invalid_response: "API 站回傳的內容無法識別，請稍後重試。",
+    },
+    Settings: {
+      Title: "帳號",
+      LoggedIn: "已登入，對話使用登入時取得的 API Key",
+      LoggedOut: "登入 API 站後即可開始對話",
+    },
+    Logout: {
+      Action: "登出",
+      SubTitle:
+        "只清除本瀏覽器儲存的 API Key，對話記錄保留；不會在 API 站撤銷這把 Key",
+      Done: "已登出",
+    },
+  },
 };
 
 type DeepPartial<T> = T extends object

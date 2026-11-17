@@ -27,6 +27,8 @@ import { DEFAULT_CONFIG } from "./config";
 import { getModelProvider } from "../utils/model";
 
 let fetchState = 0; // 0 not fetch, 1 fetching, 2 done
+// settles when the server config has arrived (or failed to)
+let fetchPromise: Promise<void> = Promise.resolve();
 
 const isApp = getClientConfig()?.buildMode === "export";
 
@@ -149,6 +151,8 @@ const DEFAULT_ACCESS_STATE = {
   defaultModel: "",
   visionModels: "",
   summarizeModel: "",
+  // single-site build: authorize page of the API site, empty = no sign-in
+  loginUrl: "",
 
   // tts config
   edgeTTSVoiceName: "zh-CN-YunxiNeural",
@@ -253,7 +257,7 @@ export const useAccessStore = createPersistStore(
     fetch() {
       if (fetchState > 0 || getClientConfig()?.buildMode === "export") return;
       fetchState = 1;
-      fetch("/api/config", {
+      fetchPromise = fetch("/api/config", {
         method: "post",
         body: null,
         headers: {
@@ -271,6 +275,9 @@ export const useAccessStore = createPersistStore(
 
           return res;
         })
+        // the stored state is read asynchronously and would overwrite the
+        // server config if it arrived later
+        .then((res: DangerConfig) => this.whenHydrated().then(() => res))
         .then((res: DangerConfig) => {
           console.log("[Config] got config from server", res);
           set(() => ({ ...res }));
@@ -281,6 +288,22 @@ export const useAccessStore = createPersistStore(
         .finally(() => {
           fetchState = 2;
         });
+    },
+    /** resolves once the state stored in this browser has been read */
+    whenHydrated(): Promise<void> {
+      const persist = useAccessStore.persist;
+      if (persist.hasHydrated()) return Promise.resolve();
+      return new Promise((resolve) => {
+        const unsubscribe = persist.onFinishHydration(() => {
+          unsubscribe();
+          resolve();
+        });
+      });
+    },
+    /** resolves once the stored state and the server config are known */
+    whenConfigLoaded(): Promise<void> {
+      this.fetch();
+      return fetchPromise.then(() => this.whenHydrated());
     },
   }),
   {

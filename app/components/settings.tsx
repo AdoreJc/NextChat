@@ -44,6 +44,7 @@ import {
 } from "../store";
 
 import { FEATURES } from "../config/site";
+import { isLoginEnabled, startLogin } from "../utils/login";
 import Locale, {
   AllLangs,
   ALL_LANG_OPTIONS,
@@ -696,6 +697,37 @@ export function Settings() {
       />
     </ListItem>
   );
+
+  // single-site build with sign-in configured: sign in / sign out
+  const loginComponent =
+    isLoginEnabled(accessStore) &&
+    (accessStore.openaiApiKey ? (
+      <ListItem
+        title={Locale.Login.Settings.Title}
+        subTitle={`${Locale.Login.Settings.LoggedIn}。${Locale.Login.Logout.SubTitle}`}
+      >
+        <IconButton
+          aria={Locale.Login.Logout.Action}
+          text={Locale.Login.Logout.Action}
+          onClick={() => {
+            accessStore.update((access) => (access.openaiApiKey = ""));
+            showToast(Locale.Login.Logout.Done);
+          }}
+        />
+      </ListItem>
+    ) : (
+      <ListItem
+        title={Locale.Login.Settings.Title}
+        subTitle={Locale.Login.Settings.LoggedOut}
+      >
+        <IconButton
+          aria={Locale.Login.Action}
+          text={Locale.Login.Action}
+          type="primary"
+          onClick={() => startLogin(useAccessStore.getState())}
+        />
+      </ListItem>
+    ));
 
   const saasStartComponent = FEATURES.upstreamLinks && (
     <ListItem
@@ -1832,6 +1864,7 @@ export function Settings() {
 
         <List id={SlotID.CustomModel}>
           {saasStartComponent}
+          {loginComponent}
           {accessCodeComponent}
 
           {!accessStore.hideUserApiKey && (

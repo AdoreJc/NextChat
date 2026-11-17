@@ -26,6 +26,7 @@ declare global {
       DEFAULT_MODEL?: string; // to control default model in every new chat window
       VISION_MODELS?: string; // to control vision models
       SUMMARIZE_MODEL?: string; // model for title and summary requests, defaults to the session model
+      LOGIN_URL?: string; // single-site build: authorize page of the API site, empty = no sign-in
 
       // stability only
       STABILITY_URL?: string;
@@ -278,5 +279,7 @@ export const getServerSideConfig = () => {
     allowedWebDavEndpoints,
     enableMcp: process.env.ENABLE_MCP === "true",
     summarizeModel: process.env.SUMMARIZE_MODEL?.trim() ?? "",
+    // authorize page of the API site, only used by the single-site build
+    loginUrl: SINGLE_SITE ? process.env.LOGIN_URL?.trim() ?? "" : "",
   };
 };

@@ -1,4 +1,11 @@
 import { useDebouncedCallback } from "use-debounce";
+import { LoginNotice } from "./login";
+import {
+  importSettingsLink,
+  isLoginEnabled,
+  loginNoticeFor,
+  needsLogin,
+} from "../utils/login";
 import React, {
   Fragment,
   RefObject,
@@ -1353,15 +1360,24 @@ function _Chat() {
   // The greeting lives in the empty state. Only the "not authorized" hint is
   // still shown as a leading message, so the user learns what to do.
   const isAuthorized = accessStore.isAuthorized();
+  // sign-in is configured and there is no key yet
+  const loginRequired = needsLogin(accessStore);
   const context: RenderMessage[] = useMemo(() => {
     const maskContext: RenderMessage[] = session.mask.hideContext
       ? []
       : session.mask.context.slice();
-    if (maskContext.length === 0 && !isAuthorized) {
+    if (maskContext.length === 0 && loginRequired) {
+      maskContext.push({ ...BOT_HELLO, content: Locale.Login.Required });
+    } else if (maskContext.length === 0 && !isAuthorized) {
       maskContext.push({ ...BOT_HELLO, content: Locale.Error.Unauthorized });
     }
     return maskContext;
-  }, [session.mask.context, session.mask.hideContext, isAuthorized]);
+  }, [
+    session.mask.context,
+    session.mask.hideContext,
+    isAuthorized,
+    loginRequired,
+  ]);
 
   // preview messages
   const renderMessages = useMemo(() => {
@@ -1473,34 +1489,31 @@ function _Chat() {
     settings: (text) => {
       if (accessStore.disableFastLink) return;
 
-      try {
-        const payload = JSON.parse(text) as {
-          key?: string;
-          url?: string;
-        };
-
-        console.log("[Command] got settings from url: ", payload);
-
-        if (payload.key || payload.url) {
-          showConfirm(
-            Locale.URLCommand.Settings +
-              `\n${JSON.stringify(payload, null, 4)}`,
-          ).then((res) => {
-            if (!res) return;
-            if (payload.key) {
-              accessStore.update(
-                (access) => (access.openaiApiKey = payload.key!),
-              );
-            }
-            if (payload.url) {
-              accessStore.update((access) => (access.openaiUrl = payload.url!));
-            }
-            accessStore.update((access) => (access.useCustomConfig = true));
-          });
-        }
-      } catch {
-        console.error("[Command] failed to get settings from url: ", text);
-      }
+      // whether sign-in is configured comes with the server config
+      accessStore
+        .whenConfigLoaded()
+        .then(() =>
+          importSettingsLink(text, {
+            loginEnabled: isLoginEnabled(useAccessStore.getState()),
+            confirm: (payload) =>
+              showConfirm(
+                Locale.URLCommand.Settings +
+                  `\n${JSON.stringify(payload, null, 4)}`,
+              ),
+            apply: (payload) => {
+              accessStore.update((access) => {
+                if (payload.key) access.openaiApiKey = payload.key;
+                if (payload.url) access.openaiUrl = payload.url;
+                access.useCustomConfig = true;
+              });
+            },
+          }),
+        )
+        .then((result) => {
+          if (result === "invalid") {
+            console.error("[Command] failed to get settings from url");
+          }
+        });
     },
   });
 
@@ -1826,6 +1839,22 @@ function _Chat() {
                   const shouldShowClearContextDivider =
                     i === clearContextIndex - 1;
 
+                  // sign-in button: under the "sign in first" hint and under
+                  // replies that report a rejected key (never a redirect)
+                  const messageText = getMessageTextContent(message);
+                  const isLoginHint =
+                    isContext &&
+                    loginRequired &&
+                    messageText === Locale.Login.Required;
+                  const loginNotice =
+                    isUser || isContext
+                      ? null
+                      : loginNoticeFor(
+                          messageText,
+                          Locale.Error.Unauthorized,
+                          accessStore,
+                        );
+
                   return (
                     <Fragment key={message.id}>
                       <div
@@ -1865,7 +1894,13 @@ function _Chat() {
                           <div className={styles["chat-message-item"]}>
                             <Markdown
                               key={message.streaming ? "loading" : "done"}
-                              content={getMessageTextContent(message)}
+                              content={
+                                loginNotice
+                                  ? messageText
+                                      .replace(Locale.Error.Unauthorized, "")
+                                      .trim()
+                                  : messageText
+                              }
                               loading={
                                 (message.preview || message.streaming) &&
                                 message.content.length === 0 &&
@@ -1917,6 +1952,16 @@ function _Chat() {
                               </div>
                             )}
                           </div>
+                          {isLoginHint && <LoginNotice />}
+                          {loginNotice && (
+                            <LoginNotice
+                              text={
+                                loginNotice === "expired"
+                                  ? Locale.Login.Expired
+                                  : Locale.Login.Required
+                              }
+                            />
+                          )}
                           {message?.audio_url && (
                             <div className={styles["chat-message-audio"]}>
                               <audio src={message.audio_url} controls />
