@@ -31,7 +31,13 @@ async function loadFresh<T>(
   load: () => Promise<T>,
 ) {
   jest.resetModules();
-  for (const key of ["BASE_URL", "CODE", "CUSTOM_MODELS", "ENABLE_MCP"]) {
+  for (const key of [
+    "BASE_URL",
+    "CODE",
+    "CUSTOM_MODELS",
+    "ENABLE_MCP",
+    "OPENAI_API_KEY",
+  ]) {
     delete process.env[key];
   }
   Object.assign(process.env, env);
@@ -155,5 +161,48 @@ describe("single-site server: third-party routes", () => {
     await expect(getMcpConfigFromFile("test-code")).rejects.toThrow(
       "MCP is not enabled",
     );
+  });
+});
+
+describe("single-site server: CUSTOM_MODELS and user keys", () => {
+  const request = (model: string) =>
+    new NextRequest("http://chat.test/api/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sk-user-key",
+      },
+      body: JSON.stringify({ model, messages: [] }),
+    });
+
+  test("a user key may use models outside CUSTOM_MODELS, the API site decides", async () => {
+    const { requestOpenai } = await loadFresh(
+      {
+        BASE_URL: "https://api.site.test",
+        CUSTOM_MODELS: "-all,+listed-model@OpenAI",
+      },
+      () => import("../app/api/common"),
+    );
+
+    const res = await requestOpenai(request("model-from-the-api-site"));
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("CUSTOM_MODELS still restricts requests when the server has its own key", async () => {
+    const { requestOpenai } = await loadFresh(
+      {
+        BASE_URL: "https://api.site.test",
+        OPENAI_API_KEY: "sk-server-key",
+        CUSTOM_MODELS: "-all,+listed-model@OpenAI",
+      },
+      () => import("../app/api/common"),
+    );
+
+    const res = await requestOpenai(request("model-from-the-api-site"));
+
+    expect(res.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

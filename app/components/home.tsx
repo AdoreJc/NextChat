@@ -31,6 +31,7 @@ import { useAccessStore } from "../store";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 import { FEATURES } from "../config/site";
+import { useSiteModels } from "../store/site-models";
 
 export function Loading(props: { noLogo?: boolean }) {
   return (
@@ -240,9 +241,24 @@ export function useLoadData() {
   }, []);
 }
 
+// single-site build: (re)load the model list of the API site whenever the
+// user's key or endpoint changes
+function useLoadSiteModels() {
+  const apiKey = useAccessStore((state) => state.openaiApiKey);
+  const apiUrl = useAccessStore((state) => state.openaiUrl);
+  const useCustomConfig = useAccessStore((state) => state.useCustomConfig);
+
+  useEffect(() => {
+    // wait until the user stops typing in the settings page
+    const timer = setTimeout(() => useSiteModels.getState().refresh(), 600);
+    return () => clearTimeout(timer);
+  }, [apiKey, apiUrl, useCustomConfig]);
+}
+
 export function Home() {
   useSwitchTheme();
   useLoadData();
+  useLoadSiteModels();
   useHtmlLang();
 
   useEffect(() => {
