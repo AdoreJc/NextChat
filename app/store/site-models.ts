@@ -17,15 +17,83 @@ const OPENAI_PROVIDER = {
   sorted: 1,
 };
 
-/** model ids of an OpenAI style `v1/models` response, without duplicates */
+// endpoint types an API site may report per model (`supported_endpoint_types`)
+// that can serve a chat conversation
+const CHAT_ENDPOINT_TYPES = [
+  "openai",
+  "openai-response",
+  "anthropic",
+  "gemini",
+];
+
+// names of models that are not for chat: embeddings, rerank, image, video,
+// audio and moderation models
+const NON_CHAT_MODEL_NAME = new RegExp(
+  [
+    "embed", // text-embedding-*, *-embedding, bge-*/m3e via the names below
+    "^bge-",
+    "^m3e",
+    "rerank",
+    "moderation",
+    "dall-?e",
+    "gpt-image",
+    "-image(-|$)", // gemini-*-image, qwen-image, ...
+    "imagen",
+    "stable-?diffusion",
+    "^sdxl",
+    "^sd-?[0-9]",
+    "^flux",
+    "midjourney",
+    "^mj[-_]",
+    "seedream",
+    "cogview",
+    "^kolors",
+    "^ideogram",
+    "^recraft",
+    "whisper",
+    "^tts",
+    "-tts(-|$)",
+    "transcribe",
+    "^sora",
+    "^veo",
+    "^kling",
+    "cogvideo",
+    "seedance",
+    "^suno",
+  ].join("|"),
+  "i",
+);
+
+/** whether a `v1/models` entry is a model people can chat with */
+export function isChatModel(model: {
+  id: string;
+  supported_endpoint_types?: unknown;
+}): boolean {
+  const types = model.supported_endpoint_types;
+  if (Array.isArray(types) && types.length > 0) {
+    // the API site says what the model can do: trust it
+    return types.some((t) => CHAT_ENDPOINT_TYPES.includes(String(t)));
+  }
+  return !NON_CHAT_MODEL_NAME.test(model.id);
+}
+
+/**
+ * chat model ids of an OpenAI style `v1/models` response, without
+ * duplicates; embedding, image and other non-chat models are left out
+ */
 export function parseModelIds(json: unknown): string[] {
   const data = (json as { data?: unknown })?.data;
   if (!Array.isArray(data)) {
     return [];
   }
   const ids = data
-    .map((m) => (m as { id?: unknown })?.id)
-    .filter((id): id is string => typeof id === "string" && id.length > 0);
+    .filter(
+      (m): m is { id: string; supported_endpoint_types?: unknown } =>
+        typeof (m as { id?: unknown })?.id === "string" &&
+        (m as { id: string }).id.length > 0,
+    )
+    .filter(isChatModel)
+    .map((m) => m.id);
   return Array.from(new Set(ids));
 }
 
