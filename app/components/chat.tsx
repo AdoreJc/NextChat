@@ -1362,6 +1362,7 @@ function _Chat() {
   const isAuthorized = accessStore.isAuthorized();
   // sign-in is configured and there is no key yet
   const loginRequired = needsLogin(accessStore);
+  const loginEnabled = isLoginEnabled(accessStore);
   const context: RenderMessage[] = useMemo(() => {
     const maskContext: RenderMessage[] = session.mask.hideContext
       ? []
@@ -1846,6 +1847,13 @@ function _Chat() {
                     isContext &&
                     loginRequired &&
                     messageText === Locale.Login.Required;
+                  // with sign-in the upstream hint about filling in a key is
+                  // wrong, on old replies too
+                  const hideKeyHint =
+                    !isUser &&
+                    !isContext &&
+                    loginEnabled &&
+                    messageText.includes(Locale.Error.Unauthorized);
                   const loginNotice =
                     isUser || isContext
                       ? null
@@ -1899,10 +1907,10 @@ function _Chat() {
                             <Markdown
                               key={message.streaming ? "loading" : "done"}
                               content={
-                                loginNotice
+                                hideKeyHint
                                   ? messageText
                                       .replace(Locale.Error.Unauthorized, "")
-                                      .trim()
+                                      .trim() || Locale.Login.Expired
                                   : messageText
                               }
                               loading={
