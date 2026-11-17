@@ -1,4 +1,4 @@
-import DeleteIcon from "../icons/delete.svg";
+import { TrashLine } from "./line-icons";
 
 import styles from "./home.module.scss";
 import {
@@ -13,7 +13,6 @@ import { useChatStore } from "../store";
 import Locale from "../locales";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Path } from "../constant";
-import { MaskAvatar } from "./mask";
 import { Mask } from "../store/mask";
 import { useRef, useEffect } from "react";
 import { showConfirm } from "./ui-lib";
@@ -60,42 +59,21 @@ export function ChatItem(props: {
           {...provided.dragHandleProps}
           title={`${props.title}\n${Locale.ChatItem.ChatItemCount(
             props.count,
-          )}`}
+          )}\n${props.time}`}
         >
-          {props.narrow ? (
-            <div className={styles["chat-item-narrow"]}>
-              <div className={clsx(styles["chat-item-avatar"], "no-dark")}>
-                <MaskAvatar
-                  avatar={props.mask.avatar}
-                  model={props.mask.modelConfig.model}
-                />
-              </div>
-              <div className={styles["chat-item-narrow-count"]}>
-                {props.count}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className={styles["chat-item-title"]}>{props.title}</div>
-              <div className={styles["chat-item-info"]}>
-                <div className={styles["chat-item-count"]}>
-                  {Locale.ChatItem.ChatItemCount(props.count)}
-                </div>
-                <div className={styles["chat-item-date"]}>{props.time}</div>
-              </div>
-            </>
-          )}
+          <div className={styles["chat-item-title"]}>{props.title}</div>
 
-          <div
+          <button
             className={styles["chat-item-delete"]}
+            aria-label={Locale.Chat.Actions.Delete}
             onClickCapture={(e) => {
               props.onDelete?.();
               e.preventDefault();
               e.stopPropagation();
             }}
           >
-            <DeleteIcon />
-          </div>
+            <TrashLine size={16} />
+          </button>
         </div>
       )}
     </Draggable>

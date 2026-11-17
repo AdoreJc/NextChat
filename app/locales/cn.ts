@@ -91,6 +91,11 @@ const cn = {
       return inputHints + "，/ 触发补全，: 触发命令";
     },
     Send: "发送",
+    Greeting: "今天想聊点什么？",
+    Placeholder: "有问题，尽管问",
+    Disclaimer: "AI 生成的内容可能有误，请核对重要信息。",
+    Suggestions: ["帮我写一封邮件", "解释一段代码", "总结一篇文章的要点"],
+    More: "更多功能",
     StartSpeak: "说话",
     StopSpeak: "停止",
     Config: {
@@ -152,6 +157,9 @@ const cn = {
   },
   Home: {
     NewChat: "新的聊天",
+    Recents: "最近聊天",
+    ToggleSidebar: "展开或收起侧栏",
+    OpenSidebar: "打开侧栏",
     DeleteChat: "确认删除选中的对话？",
     DeleteToast: "已删除会话",
     Revert: "撤销",
