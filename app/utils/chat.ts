@@ -383,6 +383,8 @@ export function stream(
         throw e;
       },
       openWhenHidden: true,
+    }).catch(() => {
+      // already reported through onError above
     });
   }
   console.debug("[ChatAPI] start");
@@ -660,6 +662,8 @@ export function streamWithThink(
         throw e;
       },
       openWhenHidden: true,
+    }).catch(() => {
+      // already reported through onError above
     });
   }
   console.debug("[ChatAPI] start");

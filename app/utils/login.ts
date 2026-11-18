@@ -423,10 +423,17 @@ export function mayCarryLoginKey(
   }
 }
 
+const KEY_BLOCKED_ERROR = "LoginKeyBlocked";
+
 /**
- * Put the check above in front of every request this page makes: a request
- * that would take the sign-in key anywhere else is not sent and fails with
- * a readable error. Addresses are not rewritten.
+ * Put the check above on `window.fetch` of this page: a request that would
+ * take the sign-in key anywhere else is not sent and fails with a readable
+ * error. Addresses are not rewritten.
+ *
+ * This is one more layer, not the only one. It sees requests made through
+ * `window.fetch` of this page only, and it recognises the key only where it
+ * appears as it is in the address or in a header. Anything added later that
+ * sends the key has to go through `fetch` to be covered.
  */
 export function installLoginKeyGuard(
   win: {
@@ -438,23 +445,58 @@ export function installLoginKeyGuard(
 ) {
   const send = win.fetch;
   const guarded: typeof fetch = function (this: unknown, input, init) {
-    let url = "";
+    // the address is read once: what is checked is what is sent
+    let target: RequestInfo;
+    let url: string;
     let headers: Headers;
     try {
-      const isRequest =
-        typeof Request !== "undefined" && input instanceof Request;
-      url = isRequest ? input.url : String(input);
-      headers = new Headers(init?.headers ?? (isRequest ? input.headers : {}));
-    } catch {
-      headers = new Headers();
+      if (typeof Request !== "undefined" && input instanceof Request) {
+        target = input;
+        url = input.url;
+        headers = new Headers(init?.headers ?? input.headers);
+      } else {
+        url = String(input);
+        target = url;
+        headers = new Headers(init?.headers ?? {});
+      }
+    } catch (e) {
+      // a request that cannot be read is not sent
+      return Promise.reject(e);
     }
     if (!mayCarryLoginKey(url, headers, getAccess(), win.location.href)) {
-      return Promise.reject(new Error(message()));
+      const error = new Error(message());
+      error.name = KEY_BLOCKED_ERROR;
+      return Promise.reject(error);
     }
-    return send.call(win, input, init);
+    return send.call(win, target, init);
   };
   win.fetch = guarded;
   return guarded;
+}
+
+/**
+ * The text to show for a request the guard above did not send, or
+ * `undefined` for any other error.
+ */
+export function keyBlockedText(error: unknown): string | undefined {
+  const e = error as { name?: unknown; message?: unknown } | null | undefined;
+  return e?.name === KEY_BLOCKED_ERROR && typeof e.message === "string"
+    ? e.message
+    : undefined;
+}
+
+/**
+ * A copy of the access config that can leave the browser (a backup file, a
+ * synced state): while the access config is managed by the sign-in, the key
+ * and the record of the sign-in stay here.
+ */
+export function withoutLoginKey<T extends AccessLike>(access: T): T {
+  if (!accessManagedBySignIn(access)) return access;
+  const copy = { ...access };
+  delete copy.openaiApiKey;
+  delete copy.loginAt;
+  delete copy.loginOrigin;
+  return copy;
 }
 
 /**

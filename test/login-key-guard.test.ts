@@ -6,7 +6,11 @@ import { useAccessStore } from "../app/store/access";
 import { useChatStore } from "../app/store/chat";
 import { ChatGPTApi } from "../app/client/platforms/openai";
 import { ApiPath, ServiceProvider } from "../app/constant";
-import { installLoginKeyGuard, mayCarryLoginKey } from "../app/utils/login";
+import {
+  installLoginKeyGuard,
+  keyBlockedText,
+  mayCarryLoginKey,
+} from "../app/utils/login";
 
 // A key received through sign-in belongs to the API site it came from.
 // Three layers keep it there: the single-site client only knows one endpoint,
@@ -204,6 +208,49 @@ describe("the guard", () => {
       "/api/config",
     ]);
   });
+
+  test("reads the address once: what is checked is what is sent", async () => {
+    useNetwork();
+    useAccessStore.getState().setLogin(TEST_KEY, API_ORIGIN);
+    const headers = { Authorization: `Bearer ${TEST_KEY}` };
+    // an address that reads differently every time it is turned into text
+    const answers = [`${API_ORIGIN}/v1/models`, `${OTHER}/v1/models`];
+    const address = { toString: () => answers.shift() ?? `${OTHER}/later` };
+
+    await guardedFetch(address as unknown as string, { headers });
+
+    expect(sent.map(([url]) => url)).toEqual([`${API_ORIGIN}/v1/models`]);
+    expect(answers).toHaveLength(1);
+  });
+
+  test("a request that cannot be read is not sent", async () => {
+    const network = useNetwork();
+    useAccessStore.getState().setLogin(TEST_KEY, API_ORIGIN);
+    const address = {
+      toString() {
+        throw new Error("no address");
+      },
+    };
+
+    await expect(guardedFetch(address as unknown as string)).rejects.toThrow(
+      "no address",
+    );
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  test("a refused request can be told from any other failure", async () => {
+    useNetwork();
+    useAccessStore.getState().setLogin(TEST_KEY, API_ORIGIN);
+    const refused = await guardedFetch(`${OTHER}/v1/models`, {
+      headers: { Authorization: `Bearer ${TEST_KEY}` },
+    }).catch((error) => error);
+
+    expect(keyBlockedText(refused)).toBe(BLOCKED);
+    expect(keyBlockedText(new Error(BLOCKED))).toBeUndefined();
+    expect(keyBlockedText(new TypeError("Failed to fetch"))).toBeUndefined();
+    expect(keyBlockedText(undefined)).toBeUndefined();
+    expect(keyBlockedText("text")).toBeUndefined();
+  });
 });
 
 describe("signing in and out", () => {
@@ -338,6 +385,43 @@ describe("a conversation and settings of another provider, left in this browser"
     await useSiteModels.getState().refresh();
     expect(requests()).toEqual([]);
     expect(useSiteModels.getState().ids).toBeNull();
+  });
+});
+
+describe("what the conversation shows", () => {
+  /** send a message as the chat page does, wait for the reply to settle */
+  async function send(text: string) {
+    await useChatStore.getState().onUserInput(text);
+    const last = () => useChatStore.getState().currentSession().messages.at(-1);
+    for (let i = 0; i < 400 && last()?.streaming; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    return last();
+  }
+
+  test("a refused request is explained in plain words, not as a code block", async () => {
+    useNetwork();
+    useAccessStore.getState().setLogin(TEST_KEY, API_ORIGIN);
+    useAccessStore.setState({ openaiUrl: OTHER });
+
+    const reply = await send("hello");
+
+    expect(reply?.role).toBe("assistant");
+    expect(reply?.isError).toBe(true);
+    expect(String(reply?.content).trim()).toBe(BLOCKED);
+    expect(requests()).toEqual([]);
+  });
+
+  test("any other failure is shown as before", async () => {
+    const network = useNetwork();
+    useAccessStore.getState().setLogin(TEST_KEY, API_ORIGIN);
+    network.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    const reply = await send("hello");
+
+    expect(reply?.isError).toBe(true);
+    expect(reply?.content).toContain("```json");
+    expect(reply?.content).toContain("Failed to fetch");
   });
 });
 
