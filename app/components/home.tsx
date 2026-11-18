@@ -14,7 +14,7 @@ import dynamic from "next/dynamic";
 import { Path, SlotID } from "../constant";
 import { ErrorBoundary } from "./error";
 
-import { getISOLang, getLang } from "../locales";
+import Locale, { getISOLang, getLang } from "../locales";
 
 import {
   HashRouter as Router,
@@ -35,6 +35,7 @@ import { useSiteModels } from "../store/site-models";
 import {
   AUTH_CALLBACK_PATH,
   captureAuthCallback,
+  installLoginKeyGuard,
   LOGIN_PATH,
 } from "../utils/login";
 
@@ -42,6 +43,12 @@ import {
 // runs, the callback page picks it up from memory
 if (typeof window !== "undefined") {
   captureAuthCallback();
+  // a key from a sign-in only ever goes to the API site it came from
+  installLoginKeyGuard(
+    window,
+    () => useAccessStore.getState(),
+    () => Locale.Login.KeyBlocked,
+  );
 }
 
 export function Loading(props: { noLogo?: boolean }) {

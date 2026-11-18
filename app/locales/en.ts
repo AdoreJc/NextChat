@@ -891,6 +891,8 @@ const en: LocaleType = {
     Failed: "Sign-in failed",
     Retry: "Try again",
     BackToChat: "Back to chat",
+    KeyBlocked:
+      "To protect the key from your sign-in, this request was not sent: it was not going to the API site you signed in to. Check the endpoint in the settings, or sign out and sign in again.",
     Errors: {
       state_mismatch:
         "This sign-in request is invalid or has expired. Please sign in again.",

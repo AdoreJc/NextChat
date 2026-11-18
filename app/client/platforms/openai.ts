@@ -46,6 +46,7 @@ import {
 import { fetch } from "@/app/utils/stream";
 
 import { withUnauthorizedHint } from "@/app/utils/login";
+import { FEATURES } from "@/app/config/site";
 export interface OpenAIListModelResponse {
   object: string;
   data: Array<{
@@ -88,7 +89,8 @@ export class ChatGPTApi implements LLMApi {
 
     let baseUrl = "";
 
-    const isAzure = path.includes("deployments");
+    // single-site build: one OpenAI compatible endpoint, no Azure addresses
+    const isAzure = FEATURES.multiProvider && path.includes("deployments");
     if (accessStore.useCustomConfig) {
       if (isAzure && !accessStore.isValidAzure()) {
         throw Error(
@@ -272,7 +274,10 @@ export class ChatGPTApi implements LLMApi {
 
     try {
       let chatPath = "";
-      if (modelConfig.providerName === ServiceProvider.Azure) {
+      if (
+        FEATURES.multiProvider &&
+        modelConfig.providerName === ServiceProvider.Azure
+      ) {
         // find model, and get displayName as deployName
         const { models: configModels, customModels: configCustomModels } =
           useAppConfig.getState();

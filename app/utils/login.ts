@@ -35,6 +35,7 @@ type AccessLike = {
   loginUrl?: string;
   openaiApiKey?: string;
   loginAt?: number;
+  loginOrigin?: string;
 };
 
 function stateStorage(): StateStorage | null {
@@ -385,6 +386,75 @@ export async function completeLogin(
 
   deps.save(key, apiOrigin);
   return { ok: true };
+}
+
+/**
+ * A key received through sign-in belongs to the API site it came from. This
+ * says whether a request may go out: one that carries that key (in a header
+ * or in its address) is only allowed to the origin recorded at sign-in.
+ * Requests without the key, and everything while the key in use did not come
+ * from a sign-in, are not looked at.
+ */
+export function mayCarryLoginKey(
+  url: string,
+  headers: Iterable<[string, string]>,
+  access: AccessLike,
+  baseUrl: string,
+) {
+  const key = access.openaiApiKey;
+  if (!key || !((access.loginAt ?? 0) > 0)) return true;
+
+  let carries = url.includes(key);
+  for (const [, value] of headers) {
+    if (String(value).includes(key)) carries = true;
+  }
+  if (!carries) return true;
+
+  let allowed = access.loginOrigin ?? "";
+  if (!allowed) {
+    const loginUrl = normalizeLoginUrl(access.loginUrl);
+    allowed = loginUrl ? getApiOrigin(loginUrl) : "";
+  }
+  try {
+    return allowed !== "" && new URL(url, baseUrl).origin === allowed;
+  } catch {
+    // an address that cannot be read is not the API site
+    return false;
+  }
+}
+
+/**
+ * Put the check above in front of every request this page makes: a request
+ * that would take the sign-in key anywhere else is not sent and fails with
+ * a readable error. Addresses are not rewritten.
+ */
+export function installLoginKeyGuard(
+  win: {
+    fetch: typeof fetch;
+    location: Pick<Location, "href">;
+  },
+  getAccess: () => AccessLike,
+  message: () => string,
+) {
+  const send = win.fetch;
+  const guarded: typeof fetch = function (this: unknown, input, init) {
+    let url = "";
+    let headers: Headers;
+    try {
+      const isRequest =
+        typeof Request !== "undefined" && input instanceof Request;
+      url = isRequest ? input.url : String(input);
+      headers = new Headers(init?.headers ?? (isRequest ? input.headers : {}));
+    } catch {
+      headers = new Headers();
+    }
+    if (!mayCarryLoginKey(url, headers, getAccess(), win.location.href)) {
+      return Promise.reject(new Error(message()));
+    }
+    return send.call(win, input, init);
+  };
+  win.fetch = guarded;
+  return guarded;
 }
 
 /**

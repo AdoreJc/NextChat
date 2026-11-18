@@ -876,6 +876,8 @@ const cn = {
     Failed: "登录失败",
     Retry: "重试",
     BackToChat: "返回聊天",
+    KeyBlocked:
+      "为保护登录得到的 Key，这次请求没有发出：目标不是登录时的 API 站。请在设置里检查接口地址，或退出后重新登录。",
     Errors: {
       state_mismatch: "这次登录请求无效或已过期，请重新登录。",
       access_denied: "API 站拒绝了这次登录。",

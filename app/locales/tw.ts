@@ -553,6 +553,8 @@ const tw = {
     Failed: "登入失敗",
     Retry: "重試",
     BackToChat: "返回聊天",
+    KeyBlocked:
+      "為保護登入取得的 Key，這次請求沒有送出：目標不是登入時的 API 站。請在設定裡檢查介面位址，或登出後重新登入。",
     Errors: {
       state_mismatch: "這次登入請求無效或已過期，請重新登入。",
       access_denied: "API 站拒絕了這次登入。",

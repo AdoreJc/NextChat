@@ -156,10 +156,27 @@ const DEFAULT_ACCESS_STATE = {
   loginUrl: "",
   // when the key in use was received through sign-in (ms), 0 = never
   loginAt: 0,
+  // the API site that key came from; the only origin it may be sent to
+  loginOrigin: "",
 
   // tts config
   edgeTTSVoiceName: "zh-CN-YunxiNeural",
 };
+
+// single-site build: the settings of the other providers are not used. They
+// are put back to their defaults whenever the sign-in state changes, so that
+// nothing left in this browser can decide where requests go.
+const OTHER_PROVIDER_DEFAULTS = SINGLE_SITE
+  ? (Object.fromEntries(
+      Object.entries(DEFAULT_ACCESS_STATE).filter(
+        ([field]) =>
+          field === "provider" ||
+          /^(azure|google|anthropic|baidu|bytedance|alibaba|moonshot|stability|tencent|iflytek|deepseek|xai|chatglm|siliconflow|ai302)/.test(
+            field,
+          ),
+      ),
+    ) as Partial<typeof DEFAULT_ACCESS_STATE>)
+  : {};
 
 export const useAccessStore = createPersistStore(
   { ...DEFAULT_ACCESS_STATE },
@@ -298,18 +315,22 @@ export const useAccessStore = createPersistStore(
      */
     setLogin(key: string, apiOrigin: string) {
       set(() => ({
+        ...OTHER_PROVIDER_DEFAULTS,
         openaiApiKey: key,
         openaiUrl: apiOrigin,
         useCustomConfig: true,
         loginAt: Date.now(),
+        loginOrigin: apiOrigin,
       }));
     },
     /** forget the key in this browser and go back to the default endpoint */
     logout() {
       set(() => ({
+        ...OTHER_PROVIDER_DEFAULTS,
         openaiApiKey: "",
         openaiUrl: DEFAULT_OPENAI_URL,
         loginAt: 0,
+        loginOrigin: "",
       }));
     },
     /** resolves once the state stored in this browser has been read */
