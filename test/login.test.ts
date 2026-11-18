@@ -430,9 +430,10 @@ describe("callback", () => {
 
   test("a failed exchange does not start another sign-in", async () => {
     const d = deps({ fetch: exchangeFetch(400, { message: "no" }) });
-    const assign = jest.fn();
-    const replace = jest.fn();
+    // a navigation is the one thing the test page cannot do: it reports it
+    const reported = jest.spyOn(console, "error").mockImplementation(() => {});
     const before = window.location.href;
+    sessionStorage.clear();
 
     await completeLogin(good, d);
 
@@ -440,9 +441,15 @@ describe("callback", () => {
     expect(d.fetch).toHaveBeenCalledTimes(1);
     expect(d.storage.data.size).toBe(0);
     expect(sessionStorage.getItem(LOGIN_STATE_STORAGE_KEY)).toBeNull();
-    expect(assign).not.toHaveBeenCalled();
-    expect(replace).not.toHaveBeenCalled();
+    expect(reported).not.toHaveBeenCalled();
     expect(window.location.href).toBe(before);
+
+    // the same checks do notice a sign-in that is started
+    await startLogin({ loginUrl: LOGIN_URL }, { singleSite: true });
+    expect(sessionStorage.getItem(LOGIN_STATE_STORAGE_KEY)).not.toBeNull();
+    expect(reported).toHaveBeenCalled();
+    sessionStorage.clear();
+    reported.mockRestore();
   });
 
   test("an exchange answer without a usable key stores nothing", async () => {

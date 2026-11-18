@@ -7,10 +7,7 @@ import { webcrypto } from "node:crypto";
 import { useAccessStore } from "../app/store/access";
 import { LoginNotice } from "../app/components/login";
 import { ApiPath } from "../app/constant";
-import {
-  importKeepingAccess,
-  LOGIN_STATE_STORAGE_KEY,
-} from "../app/utils/login";
+import { LOGIN_STATE_STORAGE_KEY } from "../app/utils/login";
 
 const LOGIN_URL = "https://api.example.test/chat-authorize";
 const API_ORIGIN = "https://api.example.test";
@@ -99,89 +96,6 @@ describe("where requests go after signing in", () => {
     expect(access.openaiApiKey).toBe("");
     expect(access.openaiUrl).toBe(ApiPath.OpenAI);
     expect(access.loginAt).toBe(0);
-  });
-});
-
-describe("importing local data while sign-in is configured", () => {
-  const ELSEWHERE = "https://elsewhere.example.test";
-
-  // what "import" in the settings does with a backup file, minus the file
-  // dialog: merge the file into the local state and write it to the stores
-  async function importBackup(change: Record<string, unknown>) {
-    const { getLocalAppState, mergeAppState, setLocalAppState } = await import(
-      "../app/utils/sync"
-    );
-    const { StoreKey } = await import("../app/constant");
-    const backup = JSON.parse(JSON.stringify(getLocalAppState()));
-    Object.assign(backup[StoreKey.Access], change, {
-      lastUpdateTime: Date.now() + 60_000,
-    });
-    const local = getLocalAppState();
-    mergeAppState(local, backup);
-    setLocalAppState(local);
-  }
-
-  async function chatPath() {
-    const { ChatGPTApi } = await import("../app/client/platforms/openai");
-    const { OpenaiPath } = await import("../app/constant");
-    return new ChatGPTApi().path(OpenaiPath.ChatPath);
-  }
-
-  test("a backup that only changes the endpoint does not move the requests", async () => {
-    useAccessStore.setState({ loginUrl: LOGIN_URL });
-    useAccessStore.getState().setLogin(TEST_KEY, API_ORIGIN);
-
-    await importKeepingAccess(
-      () => importBackup({ openaiUrl: ELSEWHERE }),
-      useAccessStore,
-      true,
-    );
-
-    const access = useAccessStore.getState();
-    expect(access.openaiUrl).toBe(API_ORIGIN);
-    expect(access.openaiApiKey).toBe(TEST_KEY);
-    expect(await chatPath()).toBe(`${API_ORIGIN}/v1/chat/completions`);
-  });
-
-  test("nor does a backup that changes the login url, the key or the endpoint switch", async () => {
-    useAccessStore.setState({ loginUrl: LOGIN_URL });
-    useAccessStore.getState().setLogin(TEST_KEY, API_ORIGIN);
-
-    await importKeepingAccess(
-      () =>
-        importBackup({
-          loginUrl: `${ELSEWHERE}/chat-authorize`,
-          openaiApiKey: "sk-from-a-file",
-          useCustomConfig: false,
-          loginAt: 0,
-        }),
-      useAccessStore,
-      true,
-    );
-
-    const access = useAccessStore.getState();
-    expect(access.loginUrl).toBe(LOGIN_URL);
-    expect(access.openaiApiKey).toBe(TEST_KEY);
-    expect(await chatPath()).toBe(`${API_ORIGIN}/v1/chat/completions`);
-  });
-
-  test("the unguarded import is what moves them (the guard is what holds)", async () => {
-    useAccessStore.setState({ loginUrl: LOGIN_URL });
-    useAccessStore.getState().setLogin(TEST_KEY, API_ORIGIN);
-
-    await importBackup({ openaiUrl: ELSEWHERE });
-    expect(await chatPath()).toBe(`${ELSEWHERE}/v1/chat/completions`);
-  });
-
-  test("without sign-in the import works as before", async () => {
-    useAccessStore.setState({ loginUrl: "", loginAt: 0 });
-
-    await importKeepingAccess(
-      () => importBackup({ openaiUrl: ELSEWHERE, useCustomConfig: true }),
-      useAccessStore,
-      true,
-    );
-    expect(useAccessStore.getState().openaiUrl).toBe(ELSEWHERE);
   });
 });
 

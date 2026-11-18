@@ -423,21 +423,16 @@ export function loginNoticeFor(
 }
 
 /**
- * "Import local data" in the settings merges a backup file into the stores,
- * the access config (endpoint, key) included. With sign-in configured the
- * access config belongs to the sign-in: it is put back as it was, so a file
- * cannot change where the key is sent.
+ * Whether the access config (endpoint, key) of this browser is managed by the
+ * sign-in: the key in use came from a sign-in, or sign-in is configured.
+ * Then nothing merged in from outside (a backup file, a synced state) may
+ * replace it, see `app/store/sync.ts`.
  */
-export async function importKeepingAccess<T extends AccessLike>(
-  runImport: () => Promise<unknown>,
-  accessStore: { getState: () => T; setState: (state: T) => void },
+export function accessManagedBySignIn(
+  access: AccessLike,
   singleSite = SINGLE_SITE,
 ) {
-  const before = accessStore.getState();
-  await runImport();
-  if (isLoginEnabled(before, singleSite)) {
-    accessStore.setState(before);
-  }
+  return (access.loginAt ?? 0) > 0 || isLoginEnabled(access, singleSite);
 }
 
 /**
