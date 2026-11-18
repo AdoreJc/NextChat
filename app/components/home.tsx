@@ -14,7 +14,7 @@ import dynamic from "next/dynamic";
 import { Path, SlotID } from "../constant";
 import { ErrorBoundary } from "./error";
 
-import { getISOLang, getLang } from "../locales";
+import Locale, { getISOLang, getLang } from "../locales";
 
 import {
   HashRouter as Router,
@@ -32,6 +32,24 @@ import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 import { FEATURES } from "../config/site";
 import { useSiteModels } from "../store/site-models";
+import {
+  AUTH_CALLBACK_PATH,
+  captureAuthCallback,
+  installLoginKeyGuard,
+  LOGIN_PATH,
+} from "../utils/login";
+
+// sign-in callback: take the key out of the address bar before anything else
+// runs, the callback page picks it up from memory
+if (typeof window !== "undefined") {
+  captureAuthCallback();
+  // a key from a sign-in only ever goes to the API site it came from
+  installLoginKeyGuard(
+    window,
+    () => useAccessStore.getState(),
+    () => Locale.Login.KeyBlocked,
+  );
+}
 
 export function Loading(props: { noLogo?: boolean }) {
   return (
@@ -53,6 +71,17 @@ const Settings = dynamic(async () => (await import("./settings")).Settings, {
 const Chat = dynamic(async () => (await import("./chat")).Chat, {
   loading: () => <Loading noLogo />,
 });
+
+const LoginPage = dynamic(async () => (await import("./login")).LoginPage, {
+  loading: () => <Loading noLogo />,
+});
+
+const AuthCallbackPage = dynamic(
+  async () => (await import("./login")).AuthCallbackPage,
+  {
+    loading: () => <Loading noLogo />,
+  },
+);
 
 const NewChat = dynamic(async () => (await import("./new-chat")).NewChat, {
   loading: () => <Loading noLogo />,
@@ -166,6 +195,8 @@ function Screen() {
     FEATURES.share && location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isAuth = location.pathname === Path.Auth;
+  const isLogin = location.pathname === LOGIN_PATH;
+  const isAuthCallback = location.pathname === AUTH_CALLBACK_PATH;
   const isSd = FEATURES.sd && location.pathname === Path.Sd;
   const isSdNew = FEATURES.sd && location.pathname === Path.SdNew;
 
@@ -186,6 +217,8 @@ function Screen() {
   }
   const renderContent = () => {
     if (isAuth) return <AuthPage />;
+    if (isLogin) return <LoginPage />;
+    if (isAuthCallback) return <AuthCallbackPage />;
     if (isSd) return <Sd />;
     if (isSdNew) return <Sd />;
     return (

@@ -866,6 +866,37 @@ const cn = {
     GenerateParams: "生成参数",
     Detail: "详情",
   },
+  Login: {
+    Action: "登录",
+    Required: "请先登录，然后开始对话。",
+    Expired: "登录已失效，请重新登录。",
+    Redirecting: "正在前往登录页…",
+    Processing: "正在完成登录…",
+    NotConfigured: "本站没有开启登录。",
+    Failed: "登录失败",
+    Retry: "重试",
+    BackToChat: "返回聊天",
+    KeyBlocked:
+      "为保护登录得到的 Key，这次请求没有发出：目标不是登录时的 API 站。请在设置里检查接口地址，或退出后重新登录。",
+    Errors: {
+      state_mismatch: "这次登录请求无效或已过期，请重新登录。",
+      access_denied: "API 站拒绝了这次登录。",
+      server_error: "API 站暂时无法完成登录，请稍后重试。",
+      invalid_response: "API 站返回的内容无法识别，请稍后重试。",
+      exchange_failed: "登录凭证无效或已过期，请重试。",
+    },
+    Settings: {
+      Title: "账号",
+      LoggedIn: "已登录，对话使用登录时拿到的 API Key",
+      LoggedOut: "登录 API 站后即可开始对话",
+    },
+    Logout: {
+      Action: "退出登录",
+      SubTitle:
+        "只清除本浏览器保存的 API Key，对话记录保留；不会在 API 站吊销这把 Key",
+      Done: "已退出登录",
+    },
+  },
 };
 
 type DeepPartial<T> = T extends object

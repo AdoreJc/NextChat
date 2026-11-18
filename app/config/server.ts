@@ -1,6 +1,7 @@
 import md5 from "spark-md5";
 import { DEFAULT_MODELS, DEFAULT_GA_ID } from "../constant";
 import { SINGLE_SITE } from "./site";
+import { normalizeLoginUrl } from "../utils/login";
 import { isGPT4Model } from "../utils/model";
 
 declare global {
@@ -26,6 +27,7 @@ declare global {
       DEFAULT_MODEL?: string; // to control default model in every new chat window
       VISION_MODELS?: string; // to control vision models
       SUMMARIZE_MODEL?: string; // model for title and summary requests, defaults to the session model
+      LOGIN_URL?: string; // single-site build: authorize page of the API site, empty = no sign-in
 
       // stability only
       STABILITY_URL?: string;
@@ -278,5 +280,8 @@ export const getServerSideConfig = () => {
     allowedWebDavEndpoints,
     enableMcp: process.env.ENABLE_MCP === "true",
     summarizeModel: process.env.SUMMARIZE_MODEL?.trim() ?? "",
+    // authorize page of the API site, only used by the single-site build
+    // (https only; http for localhost) an unusable value counts as not set
+    loginUrl: SINGLE_SITE ? normalizeLoginUrl(process.env.LOGIN_URL) : "",
   };
 };

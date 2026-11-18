@@ -6,6 +6,7 @@ import GithubIcon from "../icons/github.svg";
 import NextChatIcon from "../icons/logo.svg";
 import DragIcon from "../icons/drag.svg";
 import {
+  LoginLine,
   MaskLine,
   NewChatLine,
   SearchLine,
@@ -16,7 +17,7 @@ import {
 
 import Locale from "../locales";
 
-import { useAppConfig, useChatStore } from "../store";
+import { useAccessStore, useAppConfig, useChatStore } from "../store";
 
 import {
   DEFAULT_SIDEBAR_WIDTH,
@@ -33,6 +34,7 @@ import dynamic from "next/dynamic";
 import clsx from "clsx";
 import { isMcpEnabled } from "../mcp/actions";
 import { FEATURES, SITE_NAME } from "../config/site";
+import { needsLogin, startLogin } from "../utils/login";
 
 // entries that only exist when their feature is switched on
 const EXTRA_ENTRIES = [
@@ -274,6 +276,8 @@ export function SideBar(props: { className?: string }) {
     checkMcpStatus();
   }, []);
 
+  const showLogin = useAccessStore((state) => needsLogin(state));
+
   const fromHome = { state: { fromHome: true } };
   const openSearch = () => navigate(Path.SearchChat, fromHome);
 
@@ -384,6 +388,17 @@ export function SideBar(props: { className?: string }) {
       )}
 
       <div className={styles["side-foot"]}>
+        {showLogin && (
+          <button
+            className={styles["side-row"]}
+            title={Locale.Login.Action}
+            data-testid="sidebar-login"
+            onClick={() => startLogin(useAccessStore.getState())}
+          >
+            <LoginLine />
+            <span>{Locale.Login.Action}</span>
+          </button>
+        )}
         <button
           className={styles["side-row"]}
           title={Locale.Settings.Title}

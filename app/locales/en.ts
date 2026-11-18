@@ -881,6 +881,41 @@ const en: LocaleType = {
     GenerateParams: "Generate Params",
     Detail: "Detail",
   },
+  Login: {
+    Action: "Sign in",
+    Required: "Sign in to start chatting.",
+    Expired: "Your sign-in has expired. Please sign in again.",
+    Redirecting: "Taking you to the sign-in page…",
+    Processing: "Finishing sign-in…",
+    NotConfigured: "Sign-in is not enabled on this site.",
+    Failed: "Sign-in failed",
+    Retry: "Try again",
+    BackToChat: "Back to chat",
+    KeyBlocked:
+      "To protect the key from your sign-in, this request was not sent: it was not going to the API site you signed in to. Check the endpoint in the settings, or sign out and sign in again.",
+    Errors: {
+      state_mismatch:
+        "This sign-in request is invalid or has expired. Please sign in again.",
+      access_denied: "The API site declined this sign-in.",
+      server_error:
+        "The API site could not finish the sign-in. Please try again later.",
+      invalid_response:
+        "The API site sent a response this page does not understand. Please try again later.",
+      exchange_failed:
+        "The sign-in could not be completed or has expired. Please try again.",
+    },
+    Settings: {
+      Title: "Account",
+      LoggedIn: "Signed in. Chats use the API key received at sign-in",
+      LoggedOut: "Sign in to the API site to start chatting",
+    },
+    Logout: {
+      Action: "Sign out",
+      SubTitle:
+        "Only removes the API key stored in this browser and keeps your chats. The key is not revoked on the API site",
+      Done: "Signed out",
+    },
+  },
 };
 
 export default en;

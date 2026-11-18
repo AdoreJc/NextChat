@@ -25,8 +25,11 @@ import { createPersistStore } from "../utils/store";
 import { ensure } from "../utils/clone";
 import { DEFAULT_CONFIG } from "./config";
 import { getModelProvider } from "../utils/model";
+import { SINGLE_SITE } from "../config/site";
 
 let fetchState = 0; // 0 not fetch, 1 fetching, 2 done
+// settles when the server config has arrived (or failed to)
+let fetchPromise: Promise<void> = Promise.resolve();
 
 const isApp = getClientConfig()?.buildMode === "export";
 
@@ -149,10 +152,31 @@ const DEFAULT_ACCESS_STATE = {
   defaultModel: "",
   visionModels: "",
   summarizeModel: "",
+  // single-site build: authorize page of the API site, empty = no sign-in
+  loginUrl: "",
+  // when the key in use was received through sign-in (ms), 0 = never
+  loginAt: 0,
+  // the API site that key came from; the only origin it may be sent to
+  loginOrigin: "",
 
   // tts config
   edgeTTSVoiceName: "zh-CN-YunxiNeural",
 };
+
+// single-site build: the settings of the other providers are not used. They
+// are put back to their defaults whenever the sign-in state changes, so that
+// nothing left in this browser can decide where requests go.
+const OTHER_PROVIDER_DEFAULTS = SINGLE_SITE
+  ? (Object.fromEntries(
+      Object.entries(DEFAULT_ACCESS_STATE).filter(
+        ([field]) =>
+          field === "provider" ||
+          /^(azure|google|anthropic|baidu|bytedance|alibaba|moonshot|stability|tencent|iflytek|deepseek|xai|chatglm|siliconflow|ai302)/.test(
+            field,
+          ),
+      ),
+    ) as Partial<typeof DEFAULT_ACCESS_STATE>)
+  : {};
 
 export const useAccessStore = createPersistStore(
   { ...DEFAULT_ACCESS_STATE },
@@ -253,12 +277,12 @@ export const useAccessStore = createPersistStore(
     fetch() {
       if (fetchState > 0 || getClientConfig()?.buildMode === "export") return;
       fetchState = 1;
-      fetch("/api/config", {
+      fetchPromise = fetch("/api/config", {
         method: "post",
         body: null,
-        headers: {
-          ...getHeaders(),
-        },
+        // single-site build: the route reads nothing from the request and the
+        // user's key has no business on this server
+        headers: SINGLE_SITE ? {} : { ...getHeaders() },
       })
         .then((res) => res.json())
         .then((res) => {
@@ -271,6 +295,9 @@ export const useAccessStore = createPersistStore(
 
           return res;
         })
+        // the stored state is read asynchronously and would overwrite the
+        // server config if it arrived later
+        .then((res: DangerConfig) => this.whenHydrated().then(() => res))
         .then((res: DangerConfig) => {
           console.log("[Config] got config from server", res);
           set(() => ({ ...res }));
@@ -281,6 +308,46 @@ export const useAccessStore = createPersistStore(
         .finally(() => {
           fetchState = 2;
         });
+    },
+    /**
+     * Signed in through the API site: keep the key and talk to the API site
+     * directly. The endpoint is set on every sign-in, whatever was stored.
+     */
+    setLogin(key: string, apiOrigin: string) {
+      set(() => ({
+        ...OTHER_PROVIDER_DEFAULTS,
+        openaiApiKey: key,
+        openaiUrl: apiOrigin,
+        useCustomConfig: true,
+        loginAt: Date.now(),
+        loginOrigin: apiOrigin,
+      }));
+    },
+    /** forget the key in this browser and go back to the default endpoint */
+    logout() {
+      set(() => ({
+        ...OTHER_PROVIDER_DEFAULTS,
+        openaiApiKey: "",
+        openaiUrl: DEFAULT_OPENAI_URL,
+        loginAt: 0,
+        loginOrigin: "",
+      }));
+    },
+    /** resolves once the state stored in this browser has been read */
+    whenHydrated(): Promise<void> {
+      const persist = useAccessStore.persist;
+      if (persist.hasHydrated()) return Promise.resolve();
+      return new Promise((resolve) => {
+        const unsubscribe = persist.onFinishHydration(() => {
+          unsubscribe();
+          resolve();
+        });
+      });
+    },
+    /** resolves once the stored state and the server config are known */
+    whenConfigLoaded(): Promise<void> {
+      this.fetch();
+      return fetchPromise.then(() => this.whenHydrated());
     },
   }),
   {

@@ -12,6 +12,25 @@ import { downloadAs, readFromFile } from "../utils";
 import { showToast } from "../components/ui-lib";
 import Locale from "../locales";
 import { createSyncClient, ProviderType } from "../utils/cloud";
+import { accessManagedBySignIn } from "../utils/login";
+
+/**
+ * While the access config is managed by the sign-in, a state coming from
+ * outside (a backup file, a synced state) must not change it: its access
+ * config is replaced by the local one before anything is merged or written.
+ */
+function keepLocalAccess(
+  localState: AppState,
+  incomingState: AppState,
+): AppState {
+  if (!accessManagedBySignIn(localState[StoreKey.Access])) {
+    return incomingState;
+  }
+  return {
+    ...incomingState,
+    [StoreKey.Access]: { ...localState[StoreKey.Access] },
+  };
+}
 
 export interface WebDavConfig {
   server: string;
@@ -73,7 +92,7 @@ export const useSyncStore = createPersistStore(
       try {
         const remoteState = JSON.parse(rawContent) as AppState;
         const localState = getLocalAppState();
-        mergeAppState(localState, remoteState);
+        mergeAppState(localState, keepLocalAccess(localState, remoteState));
         setLocalAppState(localState);
         location.reload();
       } catch (e) {
@@ -106,7 +125,10 @@ export const useSyncStore = createPersistStore(
           const parsedRemoteState = JSON.parse(
             await client.get(config.username),
           ) as AppState;
-          mergeAppState(localState, parsedRemoteState);
+          mergeAppState(
+            localState,
+            keepLocalAccess(localState, parsedRemoteState),
+          );
           setLocalAppState(localState);
         }
       } catch (e) {

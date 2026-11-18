@@ -72,6 +72,14 @@ export const SettingsLine = (p: IconProps) => (
   </Line>
 );
 
+export const LoginLine = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
+    <path d="M10 8l4 4-4 4" />
+    <path d="M14 12H4" />
+  </Line>
+);
+
 export const TrashLine = (p: IconProps) => (
   <Line {...p}>
     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
