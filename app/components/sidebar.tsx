@@ -3,7 +3,6 @@ import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./home.module.scss";
 
 import GithubIcon from "../icons/github.svg";
-import NextChatIcon from "../icons/logo.svg";
 import DragIcon from "../icons/drag.svg";
 import {
   LoginLine,
@@ -289,7 +288,6 @@ export function SideBar(props: { className?: string }) {
     >
       <div className={styles["side-top"]} data-tauri-drag-region>
         <div className={clsx(styles["side-brand"], "no-dark")}>
-          <NextChatIcon />
           <span>{SITE_NAME}</span>
         </div>
         <button
