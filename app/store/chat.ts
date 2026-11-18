@@ -31,6 +31,7 @@ import {
 import Locale, { getLang } from "../locales";
 import { SINGLE_SITE } from "../config/site";
 import { prettyObject } from "../utils/format";
+import { keyBlockedText } from "../utils/login";
 import { createPersistStore } from "../utils/store";
 import { estimateTokenLength } from "../utils/token";
 import { ModelConfig, ModelType, useAppConfig } from "./config";
@@ -528,10 +529,12 @@ export const useChatStore = createPersistStore(
             const isAborted = error.message?.includes?.("aborted");
             botMessage.content +=
               "\n\n" +
-              prettyObject({
-                error: true,
-                message: error.message,
-              });
+              // a request that was not sent says why in plain words
+              (keyBlockedText(error) ??
+                prettyObject({
+                  error: true,
+                  message: error.message,
+                }));
             botMessage.streaming = false;
             userMessage.isError = !isAborted;
             botMessage.isError = !isAborted;

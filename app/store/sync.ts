@@ -12,7 +12,7 @@ import { downloadAs, readFromFile } from "../utils";
 import { showToast } from "../components/ui-lib";
 import Locale from "../locales";
 import { createSyncClient, ProviderType } from "../utils/cloud";
-import { accessManagedBySignIn } from "../utils/login";
+import { accessManagedBySignIn, withoutLoginKey } from "../utils/login";
 
 /**
  * While the access config is managed by the sign-in, a state coming from
@@ -30,6 +30,17 @@ function keepLocalAccess(
     ...incomingState,
     [StoreKey.Access]: { ...localState[StoreKey.Access] },
   };
+}
+
+/**
+ * The app state as it leaves the browser (a backup file, a synced state):
+ * without the key from a sign-in, everything else as it is.
+ */
+function stateToShare(state: AppState): string {
+  return JSON.stringify({
+    ...state,
+    [StoreKey.Access]: withoutLoginKey(state[StoreKey.Access]),
+  });
 }
 
 export interface WebDavConfig {
@@ -83,7 +94,7 @@ export const useSyncStore = createPersistStore(
         : new Date().toLocaleString();
 
       const fileName = `Backup-${datePart}.json`;
-      downloadAs(JSON.stringify(state), fileName);
+      downloadAs(stateToShare(state), fileName);
     },
 
     async import() {
@@ -116,7 +127,7 @@ export const useSyncStore = createPersistStore(
       try {
         const remoteState = await client.get(config.username);
         if (!remoteState || remoteState === "") {
-          await client.set(config.username, JSON.stringify(localState));
+          await client.set(config.username, stateToShare(localState));
           console.log(
             "[Sync] Remote state is empty, using local state instead.",
           );
@@ -136,7 +147,7 @@ export const useSyncStore = createPersistStore(
         throw e;
       }
 
-      await client.set(config.username, JSON.stringify(localState));
+      await client.set(config.username, stateToShare(localState));
 
       this.markSyncTime();
     },

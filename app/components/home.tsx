@@ -1,6 +1,6 @@
 "use client";
 
-require("../polyfill");
+import "../polyfill";
 
 import { useEffect, useState } from "react";
 import styles from "./home.module.scss";

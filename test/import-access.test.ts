@@ -316,3 +316,99 @@ describe("cloud sync", () => {
     expect(persisted("access-control").openaiApiKey).toBe(FILE_KEY);
   });
 });
+
+// What leaves the browser the other way: the backup file "export" writes and
+// the state cloud sync uploads. Both run the real store functions; only the
+// click on the download link and the sync client are replaced.
+describe("export and upload", () => {
+  let downloads: string[];
+
+  beforeEach(() => {
+    downloads = [];
+    jest
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        const href = this.getAttribute("href") ?? "";
+        downloads.push(decodeURIComponent(href.slice(href.indexOf(",") + 1)));
+      });
+  });
+
+  async function exported() {
+    stores.useSyncStore.getState().export();
+    await until(() => downloads.length === 1, "the backup file");
+    return downloads[0];
+  }
+
+  /** the local state the way it is written out, for comparing the rest */
+  const local = () => JSON.parse(JSON.stringify(stores.getLocalAppState()));
+
+  test("signed in: the backup has no key and no record of the sign-in", async () => {
+    await setAccess({ loginUrl: LOGIN_URL, signedIn: true });
+
+    const text = await exported();
+    const backup = JSON.parse(text);
+
+    expect(text).not.toContain(TEST_KEY);
+    for (const field of ["openaiApiKey", "loginAt", "loginOrigin"]) {
+      expect(backup["access-control"]).not.toHaveProperty(field);
+    }
+    // everything else is in the file as it is in the browser
+    const { openaiApiKey, loginAt, loginOrigin, ...restOfAccess } =
+      local()["access-control"];
+    expect(openaiApiKey).toBe(TEST_KEY);
+    expect(backup).toEqual({ ...local(), "access-control": restOfAccess });
+    expect(backup["chat-next-web-store"].sessions.length).toBeGreaterThan(0);
+    // and the browser keeps its key
+    expect(stores.useAccessStore.getState().openaiApiKey).toBe(TEST_KEY);
+    expect(stores.useAccessStore.getState().loginAt).toBeGreaterThan(0);
+  });
+
+  test("a key from a sign-in stays out after sign-in is switched off", async () => {
+    await setAccess({
+      loginUrl: LOGIN_URL,
+      signedIn: true,
+      loginUrlAfterSignIn: "",
+    });
+
+    expect(await exported()).not.toContain(TEST_KEY);
+  });
+
+  test("without sign-in the backup is the whole state, as before", async () => {
+    await setAccess({ loginUrl: "", signedIn: false });
+    stores.useAccessStore.setState({ openaiApiKey: FILE_KEY });
+
+    const text = await exported();
+
+    expect(text).toBe(JSON.stringify(stores.getLocalAppState()));
+    expect(JSON.parse(text)["access-control"].openaiApiKey).toBe(FILE_KEY);
+  });
+
+  test("signed in: what cloud sync uploads has no key either", async () => {
+    await setAccess({ loginUrl: LOGIN_URL, signedIn: true });
+    const remote = backupWith({});
+
+    // a remote that holds a state, and one that is still empty
+    const uploads = [...(await syncWith(remote.text)), ...(await syncWith(""))];
+
+    expect(uploads).toHaveLength(2);
+    for (const text of uploads) {
+      expect(text).not.toContain(TEST_KEY);
+      expect(JSON.parse(text)["access-control"]).not.toHaveProperty("loginAt");
+      expect(JSON.parse(text)["chat-next-web-store"].sessions).toEqual(
+        local()["chat-next-web-store"].sessions,
+      );
+    }
+    expect(stores.useAccessStore.getState().openaiApiKey).toBe(TEST_KEY);
+    expect(persisted("access-control").openaiApiKey).toBe(TEST_KEY);
+  });
+
+  test("without sign-in cloud sync uploads the whole state, as before", async () => {
+    await setAccess({ loginUrl: "", signedIn: false });
+    stores.useAccessStore.setState({ openaiApiKey: FILE_KEY });
+
+    const [text] = await syncWith("");
+
+    expect(text).toBe(JSON.stringify(stores.getLocalAppState()));
+    expect(text).toContain(FILE_KEY);
+  });
+});
