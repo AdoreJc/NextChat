@@ -134,7 +134,7 @@
   align-items: center;
   gap: 4px;
   height: 44px;
-  padding: 0 2px 0 8px;
+  padding: 0 2px 0 10px;
   margin-bottom: 6px;
   flex: none;
 }
@@ -148,12 +148,6 @@
   font-weight: 600;
   font-size: 15px;
   color: var(--opl-text);
-
-  svg {
-    width: 26px;
-    height: 26px;
-    flex: none;
-  }
 
   span {
     overflow: hidden;
@@ -375,16 +369,12 @@
   .side-top {
     flex-direction: column;
     height: auto;
-    padding: 9px 0 0;
-    gap: 10px;
+    padding: 5px 0 0;
   }
 
+  /* the site name does not fit the rail */
   .side-brand {
-    flex: none;
-
-    span {
-      display: none;
-    }
+    display: none;
   }
 
   .side-hide-narrow {
